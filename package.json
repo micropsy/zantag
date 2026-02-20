@@ -3,6 +3,9 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "remix vite:build",
     "dev": "remix vite:dev",
@@ -15,7 +18,6 @@
     "@prisma/adapter-d1": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "@remix-run/cloudflare": "^2.17.4",
-    "@remix-run/node": "^2.17.4",
     "@remix-run/react": "^2.17.4",
     "isbot": "^5.1.35",
     "react": "^18.3.1",
