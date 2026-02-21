@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
+import { getDomainUrl } from "~/utils/helpers";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -12,12 +13,22 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const db = getDb(context);
   const profile = await db.profile.findUnique({
     where: { username: slug },
-    include: { links: true, user: true },
+    include: { 
+      links: true, 
+      user: true,
+      company: { select: { slug: true } }
+    },
   });
 
   if (!profile) {
     return new Response("Profile not found", { status: 404 });
   }
+
+  const domainUrl = getDomainUrl(request, context);
+  const isBusinessStaff = profile.user.role === "BUSINESS_STAFF" && profile.company?.slug;
+  const profileUrl = isBusinessStaff 
+    ? `${domainUrl}/b/${profile.company!.slug}/${profile.username}` 
+    : `${domainUrl}/p/${profile.username}`;
 
   // Generate vCard
   const vcard = [
@@ -26,6 +37,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     `FN:${profile.displayName || profile.username}`,
     `N:${profile.displayName || profile.username};;;;`,
     profile.bio ? `NOTE:${profile.bio}` : "",
+    `URL;type=pref:${profileUrl}`,
     ...profile.links
       .filter((l) => l.type === "PHONE")
       .map((l) => `TEL;TYPE=CELL:${l.url.replace("tel:", "")}`),

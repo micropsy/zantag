@@ -31,24 +31,17 @@ export async function getOrganizationStats(context: AppLoadContext, organization
   if (!organization) return null;
 
   const totalSeats = organization.maxSeats;
-  // Count occupied seats: Active staff + Grace Period users + Finalized Inactive Individuals (if we keep them linked)
-  // Logic: "After 30 days, the user becomes a permanent Individual, and their seat remains 'Inactive' in the company’s package usage."
-  // This implies we need to track them even after they become INDIVIDUAL if they are still "occupying" a seat.
-  // However, the schema says "companyId = null" for finalized individuals.
-  // If companyId is null, we can't count them via `profiles`.
-  // Wait, the prompt says: "After 30 days... seat remains 'Inactive' in the company’s package usage."
-  // This suggests we might need a way to track these "ghost" seats.
-  // For now, let's assume "Grace Period" users are still linked.
-  // If they are finalized (fully separated), do they still take a seat?
-  // "Scenario B: 20 days pass... Admin cannot delete. Seat permanently occupied."
-  // This means we should NOT set companyId to null if we want to count them as a seat.
-  // Or we need a separate table for "Licenses" or "Seats".
-  // Given the current schema `Profile.companyId`, if we set it to null, we lose the link.
-  // SO: For finalized individuals who consume a seat, we must KEEP `companyId` but change `User.role` to `INDIVIDUAL` and `User.status` to `INACTIVE` (or `SEPARATED`).
-  
+  // Count occupied seats: Active staff + Grace Period users + Finalized Inactive Individuals
+  // Requirement: "Even if a staff is 'Separated' and becomes an 'Individual' after 30 days, 
+  // their profile must still count as an 'Occupied Seat' (Inactive status) in the Organization table 
+  // IF the Admin did not delete them within the 30-day window."
   const occupiedSeats = organization.profiles.filter(p => {
-    // Count if User is associated
-    return p.userId; 
+    // Check if user exists and match status criteria
+    return p.userId && (
+      p.user.status === "ACTIVE" || 
+      p.user.status === "GRACE_PERIOD" || 
+      p.user.status === "INACTIVE"
+    );
   }).length;
 
   return {

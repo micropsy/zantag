@@ -43,13 +43,22 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   }
   
   // 4. Check if user is active/separated
-  if (profile.user.status !== "ACTIVE" && profile.user.status !== "GRACE_PERIOD") {
-      // Inactive users shouldn't be visible?
-      // "After 30 days, the user becomes a permanent Individual"
-      // So if status is INDIVIDUAL (removed from company), they shouldn't be here.
-      // But we already checked `profile.companyId !== company.id`.
-      // If they were removed, `companyId` would be null.
-      // So we are good.
+  if (profile.user.status === "INACTIVE") {
+      // User is now a permanent Individual, redirect to their personal profile
+      return redirect(`/p/${username}`);
+  }
+
+  if (profile.user.status === "GRACE_PERIOD" && profile.user.separatedAt) {
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - new Date(profile.user.separatedAt).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 30) {
+         // Grace period over, treated as permanent Individual
+         return redirect(`/p/${username}`);
+      }
+      // If within 30 days, they are still shown as staff (or maybe with a warning?)
+      // For now, we show them as staff until deleted or finalized.
   }
 
   return json({ profile, company });
