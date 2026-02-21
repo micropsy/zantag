@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/cloudflare";
-import { useLoaderData, Link } from "@remix-run/react";
+import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "@remix-run/react";
 import { 
   Card, 
   CardContent, 
@@ -33,6 +33,25 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
   return json({ profile });
 };
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
+      <div className="bg-rose-50 p-4 rounded-full">
+        <LayoutDashboard className="w-10 h-10 text-rose-600" />
+      </div>
+      <h2 className="text-xl font-bold text-slate-900">Unable to load dashboard</h2>
+      <p className="text-slate-500 max-w-sm">
+        {isRouteErrorResponse(error) 
+          ? `${error.status} ${error.statusText}`
+          : error instanceof Error 
+            ? error.message 
+            : "An unexpected error occurred."}
+      </p>
+    </div>
+  );
+}
 
 export default function DashboardIndex() {
   const { profile } = useLoaderData<typeof loader>();
