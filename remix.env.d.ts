@@ -18,6 +18,7 @@ declare global {
     RESEND_API_KEY: string;
     EMAIL_FROM: string;
     APP_URL: string;
+    SESSION_SECRET: string;
     PUBLIC_ASSETS_URL?: string;
   }
 }

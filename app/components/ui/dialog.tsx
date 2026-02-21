@@ -1,5 +1,3 @@
-"use client"; // Remix is always server/client, this directive is ignored
-
 import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"

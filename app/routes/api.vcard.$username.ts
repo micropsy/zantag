@@ -2,21 +2,20 @@ import { type LoaderFunctionArgs } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
 import { getDomainUrl } from "~/utils/helpers";
 
-export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
-  const slug = url.searchParams.get("slug");
+export const loader = async ({ params, request, context }: LoaderFunctionArgs) => {
+  const { username } = params;
 
-  if (!slug) {
-    return new Response("Missing slug", { status: 400 });
+  if (!username) {
+    return new Response("Missing username", { status: 400 });
   }
 
   const db = getDb(context);
   const profile = await db.profile.findUnique({
-    where: { username: slug },
+    where: { username },
     include: { 
       links: true, 
       user: true,
-      company: { select: { slug: true } }
+      company: { select: { slug: true, name: true } }
     },
   });
 
@@ -30,12 +29,19 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     ? `${domainUrl}/b/${profile.company!.slug}/${profile.username}` 
     : `${domainUrl}/p/${profile.username}`;
 
+  const displayName = profile.displayName || profile.username || "";
+  // Simple name split attempt
+  const parts = displayName.trim().split(/\s+/);
+  const firstName = parts[0] || "";
+  const lastName = parts.slice(1).join(" ") || "";
+  
   // Generate vCard
   const vcard = [
     "BEGIN:VCARD",
     "VERSION:3.0",
-    `FN:${profile.displayName || profile.username}`,
-    `N:${profile.displayName || profile.username};;;;`,
+    `FN:${displayName}`,
+    `N:${lastName};${firstName};;;`,
+    profile.company?.name ? `ORG:${profile.company.name}` : "",
     profile.bio ? `NOTE:${profile.bio}` : "",
     `URL;type=pref:${profileUrl}`,
     ...profile.links
@@ -52,8 +58,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
   return new Response(vcard, {
     headers: {
-      "Content-Type": "text/vcard",
-      "Content-Disposition": `attachment; filename="${slug}.vcf"`,
+      "Content-Type": "text/vcard; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${username}.vcf"`,
     },
   });
 };

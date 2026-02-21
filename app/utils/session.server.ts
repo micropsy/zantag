@@ -10,7 +10,7 @@ type SessionFlashData = {
 };
 
 // Use a default secret for development if not provided
-const SESSION_SECRET = "super-secret-session-key"; 
+const SESSION_SECRET = (typeof process !== "undefined" && process.env.SESSION_SECRET) || "super-secret-session-key"; 
 
 export const sessionStorage = createCookieSessionStorage<SessionData, SessionFlashData>({
   cookie: {

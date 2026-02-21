@@ -28,7 +28,7 @@ export async function resolveShortCode(context: AppLoadContext, request: Request
   const username = user.profile?.username;
   if (!username) return "/"; // Fallback
 
-  if (user.role === UserRole.BUSINESS_STAFF && user.profile?.company?.slug) {
+  if (user.role === UserRole.BUSINESS_STAFF && user.profile?.company?.slug && user.status === "ACTIVE") {
     return `${domainUrl}/b/${user.profile.company.slug}/${username}`;
   }
 

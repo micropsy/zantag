@@ -59,7 +59,7 @@ export function LandingHeader({ isInvitationOnly }: LandingHeaderProps) {
           
           <div className="mt-8 pt-8 border-t border-slate-100">
             <p className="text-sm text-slate-500 text-center">
-              © 2026 ZanTag. Your Professional Identity, Simplified.
+              &copy; 2026 ZanTag. Your Professional Identity, Simplified.
             </p>
           </div>
         </div>

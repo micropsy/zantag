@@ -165,10 +165,8 @@ export default function DashboardIndex() {
   const userName = profile.user?.name || profile.displayName || "there";
 
   // Calculate profile URL
-  const isBusinessStaff = profile.user?.role === "BUSINESS_STAFF" && profile.company?.slug;
-  const profileUrl = isBusinessStaff 
-    ? `${domainUrl}/b/${profile.company!.slug}/${profile.username}` 
-    : `${domainUrl}/p/${profile.username}`;
+  // Use Master Link (Custom Username) as primary
+  const profileUrl = `${domainUrl}/${profile.username}`;
 
   return (
     <div className="space-y-8">

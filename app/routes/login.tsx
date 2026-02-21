@@ -18,22 +18,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  const formData = await request.formData();
-  const email = formData.get("email");
-  const password = formData.get("password");
+  try {
+    const formData = await request.formData();
+    const email = formData.get("email");
+    const password = formData.get("password");
 
-  if (typeof email !== "string" || typeof password !== "string") {
-    return json({ error: "Invalid form data" }, { status: 400 });
+    if (typeof email !== "string" || typeof password !== "string") {
+      return json({ error: "Invalid form data" }, { status: 400 });
+    }
+
+    const db = getDb(context);
+    const user = await db.user.findUnique({ where: { email } });
+
+    if (!user || !(await compare(password, user.password))) {
+      return json({ error: "Invalid email or password" }, { status: 400 });
+    }
+
+    return createUserSession(user.id, "/dashboard");
+  } catch (error) {
+    console.error("Login error:", error);
+    return json({ 
+      error: error instanceof Error ? error.message : "An unexpected error occurred during login" 
+    }, { status: 500 });
   }
-
-  const db = getDb(context);
-  const user = await db.user.findUnique({ where: { email } });
-
-  if (!user || !(await compare(password, user.password))) {
-    return json({ error: "Invalid email or password" }, { status: 400 });
-  }
-
-  return createUserSession(user.id, "/dashboard");
 };
 
 export default function Login() {
@@ -127,7 +134,7 @@ export default function Login() {
           </div>
           <blockquote className="space-y-6">
             <p className="text-2xl font-medium leading-relaxed">
-              &ldquo;ZanTag has completely transformed how I network. The digital business card is sleek, professional, and always makes a great first impression.&rdquo;
+              &quot;ZanTag has completely transformed how I network. The digital business card is sleek, professional, and always makes a great first impression.&quot;
             </p>
             <footer className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-lg font-bold">

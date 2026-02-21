@@ -20,7 +20,7 @@ export const links: LinksFunction = () => [
 
 export default function App() {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <Meta />
         <Links />
@@ -38,7 +38,7 @@ export default function App() {
 export function ErrorBoundary() {
   const error = useRouteError();
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <title>Oh no!</title>
         <Meta />

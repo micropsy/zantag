@@ -12,7 +12,7 @@ interface ProfileActionsProps {
 
 export function ProfileActions({ slug, name, profileUrl }: ProfileActionsProps) {
   const downloadVCard = () => {
-    window.location.href = `/api/vcard?slug=${slug}`;
+    window.location.href = `/api/vcard/${slug}`;
   };
 
   const baseUrl =

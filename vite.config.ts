@@ -19,6 +19,11 @@ export default defineConfig({
     }),
     tsconfigPaths(),
   ],
+  server: {
+    hmr: {
+      port: 24678,
+    },
+  },
   ssr: {
     external: ["node:crypto", "node:stream", "node:events", "node:path", "node:buffer", "node:util", "node:string_decoder", "node:process"],
     noExternal: ["googleapis", "google-auth-library", "gaxios", "gtoken", "gcp-metadata"],

@@ -5,7 +5,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { Globe, Mail, FileText, Download, Building } from "lucide-react";
+import { Globe, Mail, FileText, Download, Building, Phone, MapPin, Link as LinkIcon } from "lucide-react";
+import { ConnectDialog } from "~/components/public/ConnectDialog";
 import { getDb } from "~/utils/db.server";
 
 export const loader = async ({ params, context }: LoaderFunctionArgs) => {
@@ -118,18 +119,37 @@ export default function CompanyProfile() {
                 Save Contact
               </a>
             </Button>
-            <Button variant="outline" className="w-full border-blue-200 hover:bg-blue-50 text-blue-700">
-               Connect
-            </Button>
+            <ConnectDialog 
+              profileId={profile.id} 
+              profileName={profile.displayName || user.name || "User"} 
+            />
           </div>
 
           {/* Contact Info */}
           <div className="space-y-3">
-             {user.email && (
-               <div className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-200">
+             {profile.publicEmail && (
+               <a href={`mailto:${profile.publicEmail}`} className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
                  <Mail className="h-5 w-5 text-slate-400" />
-                 <span className="text-sm font-medium">{user.email}</span>
-               </div>
+                 <span className="text-sm font-medium">{profile.publicEmail}</span>
+               </a>
+             )}
+             {profile.publicPhone && (
+               <a href={`tel:${profile.publicPhone}`} className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                 <Phone className="h-5 w-5 text-slate-400" />
+                 <span className="text-sm font-medium">{profile.publicPhone}</span>
+               </a>
+             )}
+             {profile.website && (
+               <a href={profile.website} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                 <LinkIcon className="h-5 w-5 text-slate-400" />
+                 <span className="text-sm font-medium truncate">{profile.website.replace(/^https?:\/\//, '')}</span>
+               </a>
+             )}
+             {profile.location && (
+               <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.location)}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                 <MapPin className="h-5 w-5 text-slate-400" />
+                 <span className="text-sm font-medium">{profile.location}</span>
+               </a>
              )}
           </div>
 
