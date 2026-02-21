@@ -6,11 +6,9 @@ import { getUserId } from "~/utils/session.server";
 import { hash } from "bcrypt-ts";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
-import { motion } from "framer-motion";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { toast } from "sonner";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -126,95 +124,134 @@ export default function Signup() {
   }, [actionData]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-[#0F172A] via-[#0F172A] to-[#06B6D4]">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-sm md:max-w-md"
-      >
-        <Card className="w-full border-none shadow-2xl bg-white/95 backdrop-blur-xl sm:p-2">
-          <CardHeader className="space-y-4 text-center">
-            <div className="flex justify-center">
+    <div className="min-h-screen grid lg:grid-cols-2">
+      {/* Left Side - Dark Panel */}
+      <div className="hidden lg:flex flex-col justify-between bg-[#0F172A] p-12 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0F172A] to-[#083344] z-0" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#06B6D4]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#06B6D4]/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        
+        <div className="relative z-10 flex items-center gap-3">
+          <img src="/logo.png" alt="ZanTag" width={40} height={40} className="rounded-lg bg-white/10 p-1" />
+          <span className="text-2xl font-bold tracking-tight">ZanTag</span>
+        </div>
+
+        <div className="relative z-10 max-w-lg">
+          <h1 className="text-5xl font-extrabold tracking-tight mb-6 leading-tight">
+            Start your <span className="text-[#06B6D4]">digital journey.</span>
+          </h1>
+          <p className="text-lg text-slate-400 leading-relaxed">
+            Create your professional profile, connect with others, and grow your network with ZanTag.
+          </p>
+        </div>
+
+        <div className="relative z-10 text-slate-500 text-sm">
+          © 2026 ZanTag. All rights reserved.
+        </div>
+      </div>
+
+      {/* Right Side - Signup Form */}
+      <div className="flex items-center justify-center p-8 bg-white">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center lg:text-left">
+            <div className="flex justify-center lg:hidden mb-6">
               <img src="/logo.png" alt="ZanTag" width={48} height={48} className="rounded-lg" />
             </div>
-            <CardTitle className="text-3xl font-extrabold tracking-tight text-slate-900">
-              Start your digital journey
-            </CardTitle>
-            <CardDescription className="text-slate-500">
-              Enter your email, password, and invitation code to get started
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form method="post" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <motion.div whileFocus={{ scale: 1.01 }} whileHover={{ scale: 1.005 }}>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    required
-                    className="transition-all h-11 text-base"
-                  />
-                </motion.div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <motion.div whileFocus={{ scale: 1.01 }} whileHover={{ scale: 1.005 }}>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    required
-                    className="transition-all h-11 text-base"
-                  />
-                </motion.div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="inviteCode">Invitation Code</Label>
-                <motion.div whileFocus={{ scale: 1.01 }} whileHover={{ scale: 1.005 }}>
-                  <Input
-                    id="inviteCode"
-                    name="inviteCode"
-                    type="text"
-                    placeholder="ENTER-CODE-HERE"
-                    defaultValue={defaultInviteCode}
-                    required
-                    className="transition-all h-11 text-base uppercase tracking-wider"
-                  />
-                </motion.div>
-              </div>
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900">Create an account</h2>
+            <p className="mt-2 text-slate-600">Enter your details to get started</p>
+          </div>
 
-              {actionData?.error && (
-                <div className="text-red-500 text-sm font-medium text-center">
-                  {actionData.error}
-                </div>
-              )}
+          <Form method="post" className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="name@example.com"
+                required
+                className="h-12 text-base"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                required
+                className="h-12 text-base"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inviteCode">Invitation Code</Label>
+              <Input
+                id="inviteCode"
+                name="inviteCode"
+                type="text"
+                placeholder="ENTER-CODE-HERE"
+                defaultValue={defaultInviteCode}
+                required
+                className="h-12 text-base uppercase tracking-wider font-mono"
+              />
+            </div>
 
-              <Button 
-                type="submit" 
-                className="w-full bg-[#06B6D4] hover:bg-[#0891B2] h-11 text-base font-medium"
-                disabled={isSubmitting}
-              >
-                <motion.div className="flex items-center justify-center w-full" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Account
-                </motion.div>
-              </Button>
-
-              <div className="text-center text-sm text-slate-500 mt-4">
-                Already have an account?{" "}
-                <Link to="/login" className="text-[#06B6D4] hover:underline font-medium">
-                  Log in
-                </Link>
+            {actionData?.error && (
+              <div className="text-red-500 text-sm font-medium text-center p-2 bg-red-50 rounded-lg">
+                {actionData.error}
               </div>
-            </Form>
-          </CardContent>
-        </Card>
-      </motion.div>
+            )}
+
+            <Button 
+              type="submit" 
+              className="w-full bg-[#06B6D4] hover:bg-[#0891B2] h-12 text-base font-medium"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+              Create Account
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-slate-500">Or continue with</span>
+              </div>
+            </div>
+
+            <Button variant="outline" type="button" className="w-full h-12 text-base font-medium border-slate-200" disabled>
+              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335"
+                />
+              </svg>
+              Google (Coming Soon)
+            </Button>
+          </Form>
+
+          <p className="text-center text-sm text-slate-600">
+            Already have an account?{" "}
+            <Link to="/login" className="font-semibold text-[#06B6D4] hover:text-[#0891B2] hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
