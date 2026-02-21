@@ -3,33 +3,10 @@ import { Outlet, useLoaderData, isRouteErrorResponse, useRouteError } from "@rem
 import { Sidebar } from "~/components/dashboard/Sidebar";
 import { MobileNav } from "~/components/dashboard/MobileNav";
 import { Toaster } from "~/components/ui/sonner";
-import { requireUserId } from "~/utils/session.server";
-import { getDb } from "~/utils/db.server";
+import { requireUser } from "~/utils/session.server";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
-  const db = getDb(context);
-  
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isEmailVerified: true,
-      profile: {
-        select: {
-          id: true,
-          username: true,
-        }
-      }
-    }
-  });
-
-  if (!user) {
-    throw new Response("User not found", { status: 404 });
-  }
+  const user = await requireUser(request, context);
 
   if (!user.isEmailVerified) {
     return redirect(`/verify-sent?email=${user.email}`);

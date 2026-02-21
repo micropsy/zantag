@@ -1,27 +1,18 @@
 import { type LoaderFunctionArgs, json } from "@remix-run/cloudflare";
 import { useLoaderData } from "@remix-run/react";
 import { getDb } from "~/utils/db.server";
-import { requireUserId } from "~/utils/session.server";
+import { requireAdmin } from "~/utils/session.server";
 import { UserRole } from "~/types";
 import { AdminUserTable } from "~/components/admin/AdminUserTable";
 import { AdminCompanyTable } from "~/components/admin/AdminCompanyTable";
 import { InvitationManager } from "~/components/admin/InvitationManager";
 import { SystemConfig } from "~/components/admin/SystemConfig";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
+  const currentUser = await requireAdmin(request, context);
   const db = getDb(context);
-
-  const currentUser = await db.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
-
-  if (!currentUser || (currentUser.role !== UserRole.SUPER_ADMIN && currentUser.role !== UserRole.BUSINESS_ADMIN)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
 
   // Fetch users for AdminUserTable
   // Only SUPER_ADMIN can see all users, BUSINESS_ADMIN sees their staff?
@@ -52,92 +43,61 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
       orderBy: { createdAt: "desc" },
     });
     
-    // Admins for dropdown in CompanyTable
-    admins = users; // Reuse fetched users
+    admins = users.filter(u => u.role === UserRole.BUSINESS_ADMIN || u.role === UserRole.SUPER_ADMIN);
   }
 
-  return json({
-    user: currentUser,
+  // Fetch invite codes (REMOVED: InvitationManager fetches its own data)
+  // const inviteCodes = await db.inviteCode.findMany({
+  //   orderBy: { createdAt: "desc" },
+  // });
+
+  return json({ 
+    userRole: currentUser.role,
     users,
     organizations,
     admins,
+    // inviteCodes
   });
 };
 
 export default function AdminDashboard() {
-  const { user, users, organizations, admins } = useLoaderData<typeof loader>();
+  const { userRole, users, organizations, admins } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Admin Portal</h2>
-        <p className="text-slate-500">Manage users, organizations, and system settings.</p>
+        <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
+        <p className="text-muted-foreground">
+          Manage users, organizations, and system settings.
+        </p>
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="organizations">Organizations</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
-          {user.role === UserRole.SUPER_ADMIN && (
-            <>
-              <TabsTrigger value="organizations">Organizations</TabsTrigger>
-              <TabsTrigger value="settings">System Config</TabsTrigger>
-            </>
-          )}
+          <TabsTrigger value="settings">System Settings</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>
-                View and manage all registered users.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AdminUserTable users={users} />
-            </CardContent>
-          </Card>
+            <AdminUserTable users={users} />
+        </TabsContent>
+        
+        <TabsContent value="organizations" className="space-y-4">
+            <AdminCompanyTable initial={organizations} admins={admins} />
         </TabsContent>
         
         <TabsContent value="invitations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invitation Codes</CardTitle>
-              <CardDescription>
-                Create and manage invite codes for new users.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <InvitationManager user={user} />
-            </CardContent>
-          </Card>
+            <InvitationManager user={{ role: userRole }} />
         </TabsContent>
-
-        {user.role === UserRole.SUPER_ADMIN && (
-          <>
-            <TabsContent value="organizations" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Organizations</CardTitle>
-                  <CardDescription>
-                    Manage companies and their administrators.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AdminCompanyTable initial={organizations} admins={admins} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="settings" className="space-y-4">
-              <SystemConfig user={user} />
-            </TabsContent>
-          </>
-        )}
+        
+        <TabsContent value="settings" className="space-y-4">
+            <SystemConfig user={{ role: userRole }} />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary } from "~/components/RouteErrorBoundary";
+export { RouteErrorBoundary as ErrorBoundary };

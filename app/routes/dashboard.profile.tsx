@@ -1,6 +1,6 @@
 import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/cloudflare";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { Button } from "~/components/ui/button";
@@ -9,7 +9,10 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Link as LinkIcon, Palette, User, Globe } from "lucide-react";
+import { Plus, Trash2, Link as LinkIcon } from "lucide-react";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
+
+import { profileSchema } from "~/utils/schemas";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request);
@@ -46,362 +49,240 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const intent = formData.get("intent");
 
   if (intent === "update-profile") {
-    const displayName = formData.get("displayName") as string;
-    const bio = formData.get("bio") as string;
-    const username = formData.get("username") as string; // slug
-    const primaryColor = formData.get("primaryColor") as string;
-    const secondaryColor = formData.get("secondaryColor") as string;
-    const linksJson = formData.get("links") as string;
+    const rawData = {
+      displayName: formData.get("displayName") as string,
+      username: formData.get("username") as string,
+      bio: formData.get("bio") as string,
+      primaryColor: formData.get("primaryColor") as string,
+      secondaryColor: formData.get("secondaryColor") as string,
+    };
 
-    // Validate slug uniqueness if changed
+    const result = profileSchema.safeParse(rawData);
+    if (!result.success) {
+      return json({ 
+        success: false, 
+        errors: result.error.flatten().fieldErrors 
+      }, { status: 400 });
+    }
+
+    const { displayName, username, bio, primaryColor, secondaryColor } = result.data;
+
+    // Check username uniqueness if changed
     if (username && username !== existingProfile.username) {
-      const slugExists = await db.profile.findUnique({
+      const taken = await db.profile.findUnique({
         where: { username },
       });
-      if (slugExists) {
-        return json({ error: "Username/Slug already taken" }, { status: 400 });
+      if (taken) {
+        return json({ 
+          success: false, 
+          errors: { username: ["Username is already taken"] } 
+        }, { status: 400 });
       }
     }
 
-    try {
-      // Parse links
-      const links = JSON.parse(linksJson || "[]");
+    await db.profile.update({
+      where: { id: existingProfile.id },
+      data: { 
+        displayName, 
+        bio,
+        username: username || undefined,
+        primaryColor: primaryColor || undefined,
+        secondaryColor: secondaryColor || undefined
+      },
+    });
 
-      // Update profile
-      await db.profile.update({
-        where: { id: existingProfile.id },
-        data: {
-          displayName,
-          bio,
-          username,
-          primaryColor,
-          secondaryColor,
-        },
-      });
+    return json({ success: true });
+  }
 
-      // Handle links update
-      // Strategy: Delete all existing links and recreate them to ensure sync
-      // Ideally we should update existing ones, but this is simpler for now
-      // and safe enough for this scale.
-      
-      // Get current links to minimize churn if needed, but for now full replace
-      await db.link.deleteMany({
-        where: { profileId: existingProfile.id },
-      });
+  if (intent === "add-link") {
+    const title = formData.get("title") as string;
+    const url = formData.get("url") as string;
+    const type = formData.get("type") as string;
 
-      if (links.length > 0) {
-        await db.link.createMany({
-          data: links.map((link: { title: string; url: string; type?: string; icon?: string }) => ({
-            profileId: existingProfile.id,
-            title: link.title,
-            url: link.url,
-            type: link.type || "SOCIAL",
-            icon: link.icon || null,
-          })),
-        });
-      }
+    await db.link.create({
+      data: {
+        profileId: existingProfile.id,
+        title,
+        url,
+        type,
+      },
+    });
 
-      return json({ success: true });
-    } catch (error) {
-      console.error("Profile update error:", error);
-      return json({ error: "Failed to update profile" }, { status: 500 });
-    }
+    return json({ success: true });
+  }
+
+  if (intent === "delete-link") {
+    const linkId = formData.get("linkId") as string;
+
+    await db.link.delete({
+      where: { id: linkId },
+    });
+
+    return json({ success: true });
   }
 
   return json({ error: "Invalid intent" }, { status: 400 });
 };
 
-export default function ProfilePage() {
+import { PageHeader } from "~/components/ui/page-header";
+
+export default function DashboardProfile() {
   const { profile } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
-  
-  const [formData, setFormData] = useState({
-    displayName: profile.displayName || "",
-    bio: profile.bio || "",
-    username: profile.username || "",
-    primaryColor: profile.primaryColor || "#0F172A",
-    secondaryColor: profile.secondaryColor || "#06B6D4",
-  });
-
-  // Allow links to be partial during editing (optimistic UI)
-  type LinkItem = {
-    id: string;
-    title: string;
-    url: string;
-    type: string;
-    icon?: string | null;
-    profileId?: string;
-    createdAt?: string | Date;
-    updatedAt?: string | Date;
-  };
-
-  const [links, setLinks] = useState<LinkItem[]>(profile.links || []);
   const isSubmitting = fetcher.state === "submitting";
 
+  const actionData = fetcher.data as { success?: boolean; errors?: Record<string, string[]> };
+
   useEffect(() => {
-    const data = fetcher.data as { success?: boolean; error?: string } | undefined;
-    if (data?.success) {
-      toast.success("Profile updated successfully");
-    } else if (data?.error) {
-      toast.error(data.error);
+    if (fetcher.state === "idle" && actionData) {
+      if (actionData.success) {
+        toast.success("Profile updated successfully");
+      } else if (actionData.errors) {
+        toast.error("Please fix the errors below");
+      }
     }
-  }, [fetcher.data]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const addLink = () => {
-    setLinks([...links, { id: `temp-${Date.now()}`, title: "", url: "", type: "SOCIAL" }]);
-  };
-
-  const removeLink = (index: number) => {
-    const newLinks = [...links];
-    newLinks.splice(index, 1);
-    setLinks(newLinks);
-  };
-
-  const updateLink = (index: number, field: string, value: string) => {
-    const newLinks = [...links];
-    newLinks[index] = { ...newLinks[index], [field]: value };
-    setLinks(newLinks);
-  };
-
-  const handleSubmit = () => {
-    const submitData = new FormData();
-    submitData.append("intent", "update-profile");
-    submitData.append("displayName", formData.displayName);
-    submitData.append("bio", formData.bio);
-    submitData.append("username", formData.username);
-    submitData.append("primaryColor", formData.primaryColor);
-    submitData.append("secondaryColor", formData.secondaryColor);
-    submitData.append("links", JSON.stringify(links));
-    
-    fetcher.submit(submitData, { method: "post" });
-  };
+  }, [actionData, fetcher.state]);
 
   return (
-    <div className="space-y-6 max-w-4xl pb-20">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Edit Profile</h2>
-          <p className="text-slate-500 text-sm">Customize how others see your digital card.</p>
-        </div>
-        <Button 
-          onClick={handleSubmit} 
-          disabled={isSubmitting}
-          className="bg-teal-600 hover:bg-teal-700 text-white w-full sm:w-auto"
-        >
-          {isSubmitting ? "Saving..." : <><Save className="w-4 h-4 mr-2" /> Save Changes</>}
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader 
+        title="Profile" 
+        description="Manage your public profile information." 
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column: Basic Info */}
-        <div className="md:col-span-2 space-y-6">
-          <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="w-5 h-5 text-teal-600" />
-                Basic Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
-                <Input 
-                  id="displayName" 
-                  name="displayName" 
-                  value={formData.displayName} 
-                  onChange={handleInputChange} 
-                  placeholder="e.g. John Doe" 
-                />
-              </div>
+      <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>General Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <fetcher.Form method="post" className="space-y-4">
+              <input type="hidden" name="intent" value="update-profile" />
               
               <div className="space-y-2">
-                <Label htmlFor="bio">Bio / Title</Label>
-                <Textarea 
-                  id="bio" 
-                  name="bio" 
-                  value={formData.bio} 
-                  onChange={handleInputChange} 
-                  placeholder="Tell people about yourself..." 
-                  className="resize-none min-h-[100px]"
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input
+                  id="displayName"
+                  name="displayName"
+                  defaultValue={profile.displayName || ""}
+                  placeholder="John Doe"
+                  className={actionData?.errors?.displayName ? "border-red-500" : ""}
+                />
+                {actionData?.errors?.displayName && (
+                  <p className="text-sm text-red-500">{actionData.errors.displayName[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username / Slug</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  defaultValue={profile.username || ""}
+                  placeholder="johndoe"
+                  className={actionData?.errors?.username ? "border-red-500" : ""}
+                />
+                {actionData?.errors?.username && (
+                  <p className="text-sm text-red-500">{actionData.errors.username[0]}</p>
+                )}
+                <p className="text-xs text-muted-foreground">This is your public URL: zantag.com/p/username</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="primaryColor">Primary Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="color"
+                      id="primaryColor"
+                      name="primaryColor"
+                      defaultValue={profile.primaryColor || "#0F172A"}
+                      className="w-12 h-10 p-1"
+                    />
+                    <Input
+                      value={profile.primaryColor || "#0F172A"}
+                      readOnly
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="secondaryColor">Secondary Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="color"
+                      id="secondaryColor"
+                      name="secondaryColor"
+                      defaultValue={profile.secondaryColor || "#06B6D4"}
+                      className="w-12 h-10 p-1"
+                    />
+                    <Input
+                      value={profile.secondaryColor || "#06B6D4"}
+                      readOnly
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  name="bio"
+                  defaultValue={profile.bio || ""}
+                  placeholder="Tell us about yourself"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="username">Profile URL Slug</Label>
-                <div className="flex items-center">
-                  <span className="bg-slate-100 border border-r-0 border-slate-300 rounded-l-md px-3 py-2 text-slate-500 text-sm">
-                    zantag.com/
-                  </span>
-                  <Input 
-                    id="username" 
-                    name="username" 
-                    value={formData.username} 
-                    onChange={handleInputChange} 
-                    className="rounded-l-none"
-                    placeholder="username" 
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <LinkIcon className="w-5 h-5 text-teal-600" />
-                Links & Socials
-              </CardTitle>
-              <Button size="sm" variant="outline" onClick={addLink}>
-                <Plus className="w-4 h-4 mr-1" /> Add Link
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
               </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {links.length === 0 ? (
-                <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed">
-                  <LinkIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No links added yet.</p>
-                  <Button variant="link" onClick={addLink} className="text-teal-600">
-                    Add your first link
-                  </Button>
-                </div>
-              ) : (
-                links.map((link, index) => (
-                  <div key={index} className="flex gap-3 items-start p-3 bg-white rounded-lg border border-slate-200 group">
-                    <div className="grid gap-3 flex-1">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Input 
-                          placeholder="Link Title (e.g. Website)" 
-                          value={link.title}
-                          onChange={(e) => updateLink(index, "title", e.target.value)}
-                        />
-                        <Input 
-                          placeholder="URL (https://...)" 
-                          value={link.url}
-                          onChange={(e) => updateLink(index, "url", e.target.value)}
-                        />
-                      </div>
+            </fetcher.Form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Links</CardTitle>
+            <Button variant="outline" size="sm">
+              <Plus className="mr-2 h-4 w-4" /> Add Link
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {profile.links.map((link) => (
+                <div key={link.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-muted rounded-md">
+                      <LinkIcon className="h-4 w-4" />
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-slate-400 hover:text-red-500"
-                      onClick={() => removeLink(index)}
-                    >
-                      <Trash2 className="w-4 h-4" />
+                    <div>
+                      <p className="font-medium">{link.title}</p>
+                      <p className="text-sm text-muted-foreground">{link.url}</p>
+                    </div>
+                  </div>
+                  <fetcher.Form method="post">
+                    <input type="hidden" name="intent" value="delete-link" />
+                    <input type="hidden" name="linkId" value={link.id} />
+                    <Button variant="ghost" size="icon" type="submit">
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
-                  </div>
-                ))
+                  </fetcher.Form>
+                </div>
+              ))}
+              
+              {profile.links.length === 0 && (
+                <div className="text-center py-6 text-muted-foreground">
+                  No links added yet.
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column: Appearance */}
-        <div className="space-y-6">
-          <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Palette className="w-5 h-5 text-teal-600" />
-                Appearance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="primaryColor">Primary Color</Label>
-                <div className="flex gap-2 items-center">
-                  <Input 
-                    type="color" 
-                    id="primaryColor" 
-                    name="primaryColor" 
-                    value={formData.primaryColor} 
-                    onChange={handleInputChange} 
-                    className="w-12 h-12 p-1 cursor-pointer"
-                  />
-                  <Input 
-                    value={formData.primaryColor} 
-                    onChange={handleInputChange} 
-                    name="primaryColor"
-                    className="flex-1 font-mono"
-                  />
-                </div>
-                <p className="text-xs text-slate-500">Used for buttons and headers.</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="secondaryColor">Secondary Color</Label>
-                <div className="flex gap-2 items-center">
-                  <Input 
-                    type="color" 
-                    id="secondaryColor" 
-                    name="secondaryColor" 
-                    value={formData.secondaryColor} 
-                    onChange={handleInputChange} 
-                    className="w-12 h-12 p-1 cursor-pointer"
-                  />
-                  <Input 
-                    value={formData.secondaryColor} 
-                    onChange={handleInputChange} 
-                    name="secondaryColor"
-                    className="flex-1 font-mono"
-                  />
-                </div>
-                <p className="text-xs text-slate-500">Used for accents and highlights.</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-sm bg-gradient-to-br from-slate-900 to-slate-800 text-white">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2 text-white">
-                <Globe className="w-5 h-5 text-teal-400" />
-                Preview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-[9/16] bg-white rounded-3xl overflow-hidden relative shadow-inner">
-                {/* Mock Phone Preview */}
-                <div className="absolute inset-0 bg-slate-50 flex flex-col items-center pt-8 px-4">
-                  <div 
-                    className="w-20 h-20 rounded-full mb-4 flex items-center justify-center text-white text-2xl font-bold shadow-lg"
-                    style={{ backgroundColor: formData.primaryColor }}
-                  >
-                    {formData.displayName?.[0] || "?"}
-                  </div>
-                  <h3 className="font-bold text-slate-900 text-center">{formData.displayName || "Your Name"}</h3>
-                  <p className="text-xs text-slate-500 text-center mt-1">{formData.bio || "Your Bio"}</p>
-                  
-                  <div className="w-full mt-6 space-y-2">
-                    {links.map((link, i) => (
-                      <div 
-                        key={i} 
-                        className="w-full p-2 rounded-lg text-center text-xs font-medium text-white shadow-sm"
-                        style={{ backgroundColor: formData.secondaryColor }}
-                      >
-                        {link.title || "Link Title"}
-                      </div>
-                    ))}
-                    {links.length === 0 && (
-                      <div className="w-full p-2 rounded-lg bg-slate-200 text-slate-400 text-center text-xs">
-                        Links will appear here
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 mt-4 text-center">
-                Live preview of your digital card
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary } from "~/components/RouteErrorBoundary";
+export { RouteErrorBoundary as ErrorBoundary };

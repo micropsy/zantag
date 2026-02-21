@@ -30,14 +30,18 @@ export const getBaseEmailLayout = (content: string) => `
 </html>
 `;
 
-export const getVerifyEmailHtml = (code: string, url: string) => {
+export const getVerifyEmailHtml = (url: string, code?: string) => {
+  const codeSection = code ? `
+    <p>Your verification code is:</p>
+    <div class="code">${code}</div>
+    <p>Or click the button below:</p>
+  ` : `<p>Click the button below to verify your email:</p>`;
+
   const content = `
     <h2>Verify your email address</h2>
     <p>Thanks for signing up for ZanTag! Please verify your email address to continue.</p>
     <div style="text-align: center;">
-      <p>Your verification code is:</p>
-      <div class="code">${code}</div>
-      <p>Or click the button below:</p>
+      ${codeSection}
       <a href="${url}" class="btn">Verify Email</a>
     </div>
     <p>If you didn't request this, you can safely ignore this email.</p>

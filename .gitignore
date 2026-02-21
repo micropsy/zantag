@@ -5,3 +5,6 @@ build
 .wrangler
 .cache
 .dev.vars
+*.db
+*.db-journal
+*.log

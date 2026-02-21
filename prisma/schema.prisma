@@ -17,6 +17,12 @@ model User {
   isEmailVerified   Boolean     @default(false)
   verificationToken String?
   role              String      @default("INDIVIDUAL") // INDIVIDUAL, SUPER_ADMIN, BUSINESS_ADMIN, BUSINESS_STAFF
+  
+  // NEW FIELDS
+  shortCode         String?     @unique // 5-char code (e.g., 11julq)
+  status            String      @default("ACTIVE") // ACTIVE, INACTIVE, GRACE_PERIOD
+  separatedAt       DateTime?   // Timestamp when staff was removed (start of 30-day grace)
+
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   profile           Profile?
@@ -112,6 +118,10 @@ model Organization {
   name      String
   slug      String    @unique
   logo      String?
+  
+  // NEW FIELDS
+  maxSeats          Int       @default(5)
+  
   adminId   String
   admin     User      @relation(fields: [adminId], references: [id], onDelete: Cascade)
   profiles  Profile[]

@@ -4,6 +4,7 @@ import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { LeadsList } from "~/components/dashboard/LeadsList";
 import { ManualLeadForm } from "~/components/dashboard/ManualLeadForm";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request);
@@ -37,7 +38,6 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     const email = formData.get("email") as string;
     const phone = formData.get("phone") as string;
     const notes = formData.get("notes") as string;
-    const source = formData.get("source") as string;
 
     if (!name) {
       return json({ error: "Name is required" }, { status: 400 });
@@ -48,55 +48,47 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     // Verify profile ownership
     const profile = await db.profile.findUnique({
       where: { id: profileId },
+      select: { userId: true }
     });
 
     if (!profile || profile.userId !== userId) {
       return json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    try {
-      await db.contact.create({
-        data: {
-          profileId,
-          name,
-          email: email || null,
-          phone: phone || null,
-          notes: notes || null,
-          source: source || "MANUAL",
-        },
-      });
-      return json({ success: true });
-    } catch (error) {
-      console.error("Create lead error:", error);
-      return json({ error: "Failed to create lead" }, { status: 500 });
-    }
+    await db.contact.create({
+      data: {
+        profileId,
+        name,
+        email,
+        phone,
+        notes: notes, // Mapping notes to notes field
+      }
+    });
+
+    return json({ success: true });
   }
 
   return json({ error: "Invalid intent" }, { status: 400 });
 };
 
-export default function LeadsPage() {
+import { PageHeader } from "~/components/ui/page-header";
+
+export default function DashboardLeads() {
   const { leads, profileId } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Leads Manager</h2>
-          <p className="text-slate-500 text-sm">Manage and export contacts captured through your profile.</p>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <PageHeader 
+          title="Leads" 
+          description="Manage and track your captured leads." 
+        />
+        <ManualLeadForm profileId={profileId} />
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-6">
-          <ManualLeadForm profileId={profileId} />
-        </div>
-        <div className="lg:col-span-2">
-          <LeadsList leads={leads} />
-        </div>
-      </div>
+
+      <LeadsList leads={leads} />
     </div>
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary } from "~/components/RouteErrorBoundary";
+export { RouteErrorBoundary as ErrorBoundary };

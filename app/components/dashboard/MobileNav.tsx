@@ -1,20 +1,6 @@
 import { Link, useLocation } from "@remix-run/react";
 import { cn } from "~/lib/utils";
-import { 
-  User, 
-  Users, 
-  FileText, 
-  LayoutDashboard,
-  BarChart3
-} from "lucide-react";
-
-const navItems = [
-  { icon: LayoutDashboard, label: "Home", href: "/dashboard" },
-  { icon: User, label: "Profile", href: "/dashboard/profile" },
-  { icon: Users, label: "Leads", href: "/dashboard/leads" },
-  { icon: FileText, label: "Docs", href: "/dashboard/documents" },
-  { icon: BarChart3, label: "Stats", href: "/dashboard/analytics" },
-];
+import { navigationItems } from "~/components/dashboard/navigation";
 
 export function MobileNav() {
   const location = useLocation();
@@ -22,7 +8,9 @@ export function MobileNav() {
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 z-50 px-2 pb-[env(safe-area-inset-bottom)] flex justify-around items-center h-[calc(60px+env(safe-area-inset-bottom))] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-      {navItems.map((item) => {
+      {navigationItems
+        .filter(item => !item.roles && item.href !== "/dashboard/settings") // Simple filter for mobile
+        .map((item) => {
         const isActive = pathname === item.href;
         return (
           <Link
@@ -42,7 +30,7 @@ export function MobileNav() {
             <span className={cn(
               "text-[10px] font-medium tracking-tight transition-all duration-300",
               isActive ? "text-[#06B6D4] font-bold" : "text-slate-400 scale-90"
-            )}>{item.label}</span>
+            )}>{item.mobileLabel || item.label}</span>
           </Link>
         );
       })}

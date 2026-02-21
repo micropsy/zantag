@@ -6,12 +6,10 @@ export function RouteErrorBoundary() {
   
   let title = "Something went wrong";
   let message = "An unexpected error occurred.";
-  let status = 500;
 
   if (isRouteErrorResponse(error)) {
     title = `${error.status} ${error.statusText}`;
     message = error.data as string;
-    status = error.status;
   } else if (error instanceof Error) {
     message = error.message;
   }

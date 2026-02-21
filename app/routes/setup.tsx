@@ -2,7 +2,9 @@ import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
-import { Loader2, User, Type, AlignLeft } from "lucide-react";
+import { User } from "lucide-react";
+import { profileSchema } from "~/utils/schemas";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request);
@@ -22,17 +24,19 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 export const action = async ({ request, context }: ActionFunctionArgs) => {
   const userId = await requireUserId(request);
   const formData = await request.formData();
-  const username = formData.get("username");
-  const displayName = formData.get("displayName");
-  const bio = formData.get("bio");
+  
+  const rawData = {
+    username: formData.get("username") as string,
+    displayName: formData.get("displayName") as string,
+    bio: formData.get("bio") as string,
+  };
 
-  if (typeof username !== "string" || username.length < 3) {
-    return json({ error: "Username must be at least 3 characters long." }, { status: 400 });
+  const result = profileSchema.safeParse(rawData);
+  if (!result.success) {
+    return json({ errors: result.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  if (typeof displayName !== "string" || displayName.length === 0) {
-    return json({ error: "Display Name is required." }, { status: 400 });
-  }
+  const { username, displayName, bio } = result.data;
 
   const db = getDb(context);
 
@@ -43,7 +47,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     });
 
     if (existingProfile) {
-      return json({ error: "Username is already taken." }, { status: 400 });
+      return json({ errors: { username: ["Username is already taken."] } }, { status: 400 });
     }
 
     await db.profile.create({
@@ -51,103 +55,115 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         userId,
         username,
         displayName,
-        bio: typeof bio === "string" ? bio : null,
+        bio,
       },
     });
 
     return redirect("/dashboard");
   } catch (error) {
-    console.error("Profile setup error:", error);
-    return json({ error: "Failed to create profile. Please try again." }, { status: 500 });
+    console.error("Setup error:", error);
+    return json({ errors: { _global: ["An unexpected error occurred."] } }, { status: 500 });
   }
 };
 
+interface ActionData {
+  errors?: {
+    username?: string[];
+    displayName?: string[];
+    bio?: string[];
+    _global?: string[];
+  };
+}
+
 export default function Setup() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>() as ActionData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
-        <div className="text-center mb-8">
-          <img src="/logo.png" alt="ZanTag" className="w-16 h-16 rounded-xl mx-auto mb-4 object-cover" />
-          <h1 className="text-2xl font-bold text-slate-900">Setup Your Profile</h1>
-          <p className="text-slate-500 mt-2">Let&apos;s get your digital card ready.</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden">
+        <div className="p-8">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Setup Your Profile</h1>
+            <p className="text-slate-500">
+              Let&apos;s get your digital business card ready.
+            </p>
+          </div>
 
-        <Form method="post" className="space-y-6">
-          <div className="space-y-2">
-            <label htmlFor="username" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400" />
-              Username
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">@</span>
+          <Form method="post" className="space-y-6">
+            {actionData?.errors?._global && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-lg">
+                {actionData.errors._global[0]}
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <label htmlFor="username" className="block text-sm font-medium text-slate-700">
+                Username
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <User className="h-4 w-4" />
+                </div>
+                <input
+                  type="text"
+                  name="username"
+                  id="username"
+                  className={`block w-full pl-10 pr-3 py-2 border rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                    actionData?.errors?.username ? "border-red-500" : "border-slate-300"
+                  }`}
+                  placeholder="johndoe"
+                />
+              </div>
+              {actionData?.errors?.username && (
+                <p className="text-sm text-red-500">{actionData.errors.username[0]}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="displayName" className="block text-sm font-medium text-slate-700">
+                Display Name
+              </label>
               <input
                 type="text"
-                id="username"
-                name="username"
-                required
-                minLength={3}
-                placeholder="johndoe"
-                className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                name="displayName"
+                id="displayName"
+                className={`block w-full px-3 py-2 border rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  actionData?.errors?.displayName ? "border-red-500" : "border-slate-300"
+                }`}
+                placeholder="John Doe"
+              />
+              {actionData?.errors?.displayName && (
+                <p className="text-sm text-red-500">{actionData.errors.displayName[0]}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="bio" className="block text-sm font-medium text-slate-700">
+                Bio (Optional)
+              </label>
+              <textarea
+                name="bio"
+                id="bio"
+                rows={3}
+                className="block w-full px-3 py-2 border border-slate-300 rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="Tell us about yourself"
               />
             </div>
-            <p className="text-xs text-slate-400">This will be your unique profile URL.</p>
-          </div>
 
-          <div className="space-y-2">
-            <label htmlFor="displayName" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Type className="w-4 h-4 text-slate-400" />
-              Display Name
-            </label>
-            <input
-              type="text"
-              id="displayName"
-              name="displayName"
-              required
-              placeholder="John Doe"
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="bio" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <AlignLeft className="w-4 h-4 text-slate-400" />
-              Bio (Optional)
-            </label>
-            <textarea
-              id="bio"
-              name="bio"
-              rows={3}
-              placeholder="Tell us a bit about yourself..."
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
-            />
-          </div>
-
-          {actionData && "error" in actionData && (
-            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
-              {actionData.error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Creating Profile...
-              </>
-            ) : (
-              "Complete Setup"
-            )}
-          </button>
-        </Form>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? "Creating Profile..." : "Complete Setup"}
+            </button>
+          </Form>
+        </div>
       </div>
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary };

@@ -44,16 +44,17 @@ export async function getUser(request: Request, context: AppLoadContext) {
   const db = getDb(context);
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, name: true, role: true, shortCode: true, status: true },
   });
 
   return user;
 }
 
-export async function requireUserId(request: Request, redirectTo: string = new URL(request.url).pathname) {
-  const userId = await getUserId(request);
+export async function requireUserId(request: Request) {
+  const session = await getSession(request);
+  const userId = session.get("userId");
   if (!userId) {
-    const searchParams = new URLSearchParams([["redirectTo", redirectTo]]);
+    const searchParams = new URLSearchParams([["redirectTo", new URL(request.url).pathname]]);
     throw redirect(`/login?${searchParams}`);
   }
   return userId;

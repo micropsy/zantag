@@ -1,23 +1,13 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
-
-import { toast } from "sonner";
 import { Send, CheckCircle2 } from "lucide-react";
-
-const leadSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-type LeadFormValues = z.infer<typeof leadSchema>;
+import { toast } from "sonner";
+import { leadSchema, type LeadFormValues } from "~/utils/schemas";
 
 interface LeadFormProps {
   profileId: string;

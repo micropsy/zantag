@@ -1,38 +1,13 @@
 import { Link, useLocation, Form } from "@remix-run/react";
 import { cn } from "~/lib/utils";
-import { 
-  User, 
-  Users, 
-  BarChart3, 
-  FileText, 
-  Settings, 
-  LayoutDashboard,
-  LogOut
-} from "lucide-react";
+import { LogOut } from "lucide-react";
+import { navigationItems } from "~/components/dashboard/navigation";
 
 interface SidebarProps {
   user?: {
     role: string;
   };
 }
-
-interface SidebarItem {
-  icon: React.ElementType;
-  label: string;
-  href: string;
-  adminOnly?: boolean;
-  roles?: string[];
-}
-
-const sidebarItems: SidebarItem[] = [
-  { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
-  { icon: User, label: "Profile Editor", href: "/dashboard/profile" },
-  { icon: Users, label: "Leads", href: "/dashboard/leads" },
-  { icon: FileText, label: "Documents", href: "/dashboard/documents" },
-  { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-  { icon: Users, label: "Admin Portal", href: "/admin", roles: ["SUPER_ADMIN", "BUSINESS_ADMIN"] },
-];
 
 export function Sidebar({ user }: SidebarProps) {
   const location = useLocation();
@@ -47,7 +22,7 @@ export function Sidebar({ user }: SidebarProps) {
       </div>
       
       <nav className="flex-1 px-4 space-y-1 mt-4">
-        {sidebarItems
+        {navigationItems
           .filter((item) => {
             if (item.roles) return item.roles.includes(role);
             return !item.adminOnly || role === "SUPER_ADMIN";

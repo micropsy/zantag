@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/com
 import { toast } from "sonner";
 import { Lock, LogOut } from "lucide-react";
 import { compare, hash } from "bcrypt-ts";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await requireUserId(request);
@@ -66,108 +67,107 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   return json({ error: "Invalid intent" }, { status: 400 });
 };
 
-export default function SettingsPage() {
+import { PageHeader } from "~/components/ui/page-header";
+
+export default function DashboardSettings() {
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
   const formRef = useRef<HTMLFormElement>(null);
-  
+
   useEffect(() => {
-    const data = fetcher.data as { success?: boolean; error?: string } | undefined;
-    if (fetcher.state === "idle" && data?.success) {
-      toast.success("Password updated successfully");
-      formRef.current?.reset();
-    } else if (fetcher.state === "idle" && data?.error) {
-      toast.error(data.error);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = fetcher.data as any;
+    if (fetcher.state === "idle" && data) {
+      if (data.success) {
+        toast.success("Password updated successfully");
+        if (formRef.current) {
+          formRef.current.reset();
+        }
+      } else if (data && data.error) {
+        toast.error(data.error);
+      }
     }
-  }, [fetcher.state, fetcher.data]);
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newPassword = formData.get("newPassword") as string;
-    const confirmPassword = formData.get("confirmPassword") as string;
-    
-    if (newPassword !== confirmPassword) {
-      toast.error("New passwords do not match");
-      return;
-    }
-
-    formData.append("intent", "change-password");
-    fetcher.submit(formData, { method: "post" });
-  };
+  }, [fetcher.data, fetcher.state]);
 
   return (
-    <div className="space-y-6 pb-20">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Settings</h2>
-        <p className="text-slate-500 text-sm">Manage your profile and system configuration.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader 
+        title="Settings" 
+        description="Manage your account settings and preferences." 
+      />
 
-      <div className="grid gap-6 max-w-2xl">
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
+      <div className="grid gap-6">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-teal-600" />
-              Change Password
-            </CardTitle>
-            <CardDescription>Ensure your account is secure by using a strong password.</CardDescription>
+            <CardTitle>Change Password</CardTitle>
+            <CardDescription>
+              Update your password to keep your account secure.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} ref={formRef} className="space-y-4">
+            <fetcher.Form method="post" ref={formRef} className="space-y-4 max-w-md">
+              <input type="hidden" name="intent" value="change-password" />
+              
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">Current Password</Label>
-                <Input
-                  id="currentPassword"
-                  name="currentPassword"
-                  type="password"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input
-                  id="newPassword"
-                  name="newPassword"
-                  type="password"
-                  required
-                  minLength={6}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  required
-                  minLength={6}
-                />
+                <div className="relative">
+                  <Lock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="currentPassword"
+                    name="currentPassword"
+                    type="password"
+                    className="pl-9"
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="pt-2">
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
-                >
-                  {isSubmitting ? "Updating..." : "Update Password"}
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="newPassword"
+                    name="newPassword"
+                    type="password"
+                    className="pl-9"
+                    required
+                  />
+                </div>
               </div>
-            </form>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    className="pl-9"
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Updating..." : "Update Password"}
+              </Button>
+            </fetcher.Form>
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm border-red-100">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <LogOut className="w-5 h-5" />
-              Sign Out
-            </CardTitle>
-            <CardDescription>Sign out of your account on this device.</CardDescription>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardDescription>
+              Irreversible actions for your account.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Form action="/logout" method="post">
-              <Button variant="destructive" type="submit">
+              <Button variant="destructive">
+                <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
               </Button>
             </Form>
@@ -178,4 +178,4 @@ export default function SettingsPage() {
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary } from "~/components/RouteErrorBoundary";
+export { RouteErrorBoundary as ErrorBoundary };

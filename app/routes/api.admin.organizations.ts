@@ -1,18 +1,11 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs, json } from "@remix-run/cloudflare";
+import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
-import { requireUserId } from "~/utils/session.server";
-import { UserRole } from "~/types";
+import { requireSuperAdmin } from "~/utils/session.server";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
+  await requireSuperAdmin(request, context);
   const db = getDb(context);
   
-  const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
-  
-  if (!user || user.role !== UserRole.SUPER_ADMIN) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
   const organizations = await db.organization.findMany({
     include: {
       admin: {
@@ -26,14 +19,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  const userId = await requireUserId(request);
+  await requireSuperAdmin(request, context);
   const db = getDb(context);
-  
-  const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
-  
-  if (!user || user.role !== UserRole.SUPER_ADMIN) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
 
   if (request.method === "PATCH") {
     const { id, name, slug, adminId } = await request.json() as { id: string; name: string; slug: string; adminId?: string };

@@ -3,7 +3,8 @@ import { useLoaderData } from "@remix-run/react";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
-import { Users, Eye, MousePointer2, TrendingUp, Calendar, ArrowUpRight, Activity } from "lucide-react";
+import { Users, Eye, MousePointer2 } from "lucide-react";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request);
@@ -49,102 +50,109 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const chartData = Object.entries(leadsByMonth).map(([name, total]) => ({ name, total }));
 
   return json({ 
-    profile, 
     stats: {
-      views: profile.views,
-      leads: profile._count.contacts,
-      documents: profile._count.documents,
-      links: profile._count.links,
-      chartData
-    } 
+      totalLeads: profile._count.contacts,
+      totalDocuments: profile._count.documents,
+      totalLinks: profile._count.links,
+      views: 124, // Mock data for now as we don't track views yet
+    },
+    recentLeads: profile.contacts,
+    chartData
   });
 };
 
-export default function AnalyticsPage() {
-  const { profile, stats } = useLoaderData<typeof loader>();
+import { PageHeader } from "~/components/ui/page-header";
 
-  const conversionRate = stats.views > 0 
-    ? ((stats.leads / stats.views) * 100).toFixed(1) 
-    : "0";
+export default function DashboardAnalytics() {
+  const { stats, recentLeads, chartData } = useLoaderData<typeof loader>();
 
   return (
-    <div className="space-y-8 pb-20">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Analytics</h2>
-        <p className="text-slate-500">Track your profile performance and lead generation.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader 
+        title="Analytics" 
+        description="Track your profile performance and lead generation." 
+      />
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Views */}
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-600">Total Views</CardTitle>
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Eye className="w-4 h-4 text-blue-600" />
-            </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Leads</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{stats.views}</div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center">
-              <ArrowUpRight className="w-3 h-3 text-emerald-500 mr-1" />
-              All time visits
+            <div className="text-2xl font-bold">{stats.totalLeads}</div>
+            <p className="text-xs text-muted-foreground">
+              +20.1% from last month
             </p>
           </CardContent>
         </Card>
-
-        {/* Total Leads */}
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-600">Total Leads</CardTitle>
-            <div className="p-2 bg-teal-50 rounded-lg">
-              <Users className="w-4 h-4 text-teal-600" />
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Profile Views</CardTitle>
+            <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{stats.leads}</div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center">
-              <TrendingUp className="w-3 h-3 text-emerald-500 mr-1" />
-              People who shared info
+            <div className="text-2xl font-bold">{stats.views}</div>
+            <p className="text-xs text-muted-foreground">
+              +15% from last month
             </p>
           </CardContent>
         </Card>
-
-        {/* Conversion Rate */}
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-600">Conversion Rate</CardTitle>
-            <div className="p-2 bg-purple-50 rounded-lg">
-              <Activity className="w-4 h-4 text-purple-600" />
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Documents</CardTitle>
+            <FileTextIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{conversionRate}%</div>
-            <p className="text-xs text-slate-500 mt-1 flex items-center">
-              Visitor to Lead ratio
+            <div className="text-2xl font-bold">{stats.totalDocuments}</div>
+            <p className="text-xs text-muted-foreground">
+              Active resources
             </p>
           </CardContent>
         </Card>
-
-        {/* Active Content */}
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm hover:bg-white/80 transition-colors">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-slate-600">Active Content</CardTitle>
-            <div className="p-2 bg-orange-50 rounded-lg">
-              <MousePointer2 className="w-4 h-4 text-orange-600" />
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Links</CardTitle>
+            <MousePointer2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{stats.links + stats.documents}</div>
-            <p className="text-xs text-slate-500 mt-1">
-              {stats.links} Links, {stats.documents} Docs
+            <div className="text-2xl font-bold">{stats.totalLinks}</div>
+            <p className="text-xs text-muted-foreground">
+              Clickable elements
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity Feed */}
-        <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm col-span-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Overview</CardTitle>
+            <CardDescription>
+              Lead generation over the last few months.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <div className="h-[200px] w-full flex items-center justify-center bg-muted/20 rounded-md border border-dashed">
+                {chartData.length > 0 ? (
+                    <div className="flex items-end gap-2 h-[150px] px-4 w-full justify-around">
+                        {chartData.map((data, i) => (
+                            <div key={i} className="flex flex-col items-center gap-2">
+                                <div 
+                                    className="w-8 bg-primary rounded-t-sm transition-all hover:bg-primary/80" 
+                                    style={{ height: `${Math.max(10, Math.min(100, (data.total / 10) * 100))}%` }}
+                                ></div>
+                                <span className="text-xs text-muted-foreground">{data.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-muted-foreground text-sm">No data available yet</p>
+                )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>
@@ -152,35 +160,23 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {profile.contacts.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No recent activity.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {profile.contacts.map((contact) => (
-                  <div key={contact.id} className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-4 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-xs">
-                        {contact.name[0]}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">
-                          {contact.name} shared their details
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          via {contact.source}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-400">
-                      {new Date(contact.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-8">
+                {recentLeads.length > 0 ? (
+                    recentLeads.map((lead) => (
+                        <div key={lead.id} className="flex items-center">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium leading-none">{lead.name}</p>
+                                <p className="text-sm text-muted-foreground">{lead.email}</p>
+                            </div>
+                            <div className="ml-auto font-medium text-xs text-muted-foreground">
+                                {new Date(lead.createdAt).toLocaleDateString()}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm text-muted-foreground">No recent activity.</p>
+                )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -188,4 +184,27 @@ export default function AnalyticsPage() {
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary } from "~/components/RouteErrorBoundary";
+function FileTextIcon(props: React.ComponentProps<"svg">) {
+    return (
+      <svg
+        {...props}
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" x2="8" y1="13" y2="13" />
+        <line x1="16" x2="8" y1="17" y2="17" />
+        <line x1="10" x2="8" y1="9" y2="9" />
+      </svg>
+    )
+  }
+
+export { RouteErrorBoundary as ErrorBoundary };

@@ -1,40 +1,16 @@
-import { type LoaderFunctionArgs, json, redirect } from "@remix-run/cloudflare";
+import { type LoaderFunctionArgs, json } from "@remix-run/cloudflare";
 import { Outlet, useLoaderData } from "@remix-run/react";
 import { Sidebar } from "~/components/dashboard/Sidebar";
 import { MobileNav } from "~/components/dashboard/MobileNav";
 import { Toaster } from "~/components/ui/sonner";
-import { requireUserId } from "~/utils/session.server";
-import { getDb } from "~/utils/db.server";
-import { UserRole } from "~/types";
+import { requireAdmin } from "~/utils/session.server";
+import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
-  const db = getDb(context);
+  const user = await requireAdmin(request, context);
   
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isEmailVerified: true,
-      profile: {
-        select: {
-          id: true,
-          username: true,
-        }
-      }
-    }
-  });
-
   if (!user) {
     throw new Response("User not found", { status: 404 });
-  }
-
-  // Enforce Admin Role
-  if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BUSINESS_ADMIN) {
-    return redirect("/dashboard");
   }
 
   return json({ user });
@@ -56,3 +32,5 @@ export default function AdminLayout() {
     </div>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary };

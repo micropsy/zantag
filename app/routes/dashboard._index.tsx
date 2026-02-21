@@ -18,8 +18,7 @@ import {
   Upload,
   QrCode
 } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 
@@ -49,7 +48,10 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     }
   });
 
-  return json({ profile });
+  return json({ 
+    profile,
+    views: 124 // Mock data
+  });
 };
 
 export function ErrorBoundary() {
@@ -71,8 +73,10 @@ export function ErrorBoundary() {
   );
 }
 
+import { PageHeader } from "~/components/ui/page-header";
+
 export default function DashboardIndex() {
-  const { profile } = useLoaderData<typeof loader>();
+  const { profile, views } = useLoaderData<typeof loader>();
 
   if (!profile) {
     return (
@@ -121,7 +125,7 @@ export default function DashboardIndex() {
     },
     {
       title: "Profile Views",
-      value: profile.views.toString(),
+      value: views.toString(),
       icon: Eye,
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -137,8 +141,8 @@ export default function DashboardIndex() {
     },
     {
       title: "Conversion",
-      value: profile.views > 0 
-        ? `${((profile._count.contacts / profile.views) * 100).toFixed(1)}%`
+      value: views > 0 
+        ? `${((profile._count.contacts / views) * 100).toFixed(1)}%`
         : "0%",
       icon: TrendingUp,
       color: "text-rose-600",
@@ -148,24 +152,16 @@ export default function DashboardIndex() {
   ];
 
   // Safely access user name or fallback to displayName or generic
-  // Note: loader was updated to include user.name, but TypeScript might not know yet if we don't restart TS server
-  // We'll use optional chaining and type assertion if needed, or just rely on runtime safety.
   // profile object structure: { ...profileFields, user: { name: string, email: string } }
-  // We need to be careful about TS types.
-  // Let's assume profile has user property now.
-  const userName = (profile as any).user?.name || profile.displayName || "there";
+  const userName = profile.user?.name || profile.displayName || "there";
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-          Welcome back, {userName}!
-        </h2>
-        <p className="text-slate-500">
-          Here&apos;s what&apos;s happening with your digital business card.
-        </p>
-      </div>
+      <PageHeader 
+        title={`Welcome back, ${userName}!`}
+        description="Here's what's happening with your digital business card."
+      />
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

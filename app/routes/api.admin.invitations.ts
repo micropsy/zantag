@@ -1,18 +1,12 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs, json } from "@remix-run/cloudflare";
+import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
-import { requireUserId } from "~/utils/session.server";
+import { requireAdmin } from "~/utils/session.server";
 import { UserRole } from "~/types";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
+  await requireAdmin(request, context);
   const db = getDb(context);
   
-  const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
-  
-  if (!user || (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BUSINESS_ADMIN)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
   const invitations = await db.inviteCode.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -21,14 +15,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  const userId = await requireUserId(request);
+  await requireAdmin(request, context);
   const db = getDb(context);
-  
-  const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } });
-  
-  if (!user || (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.BUSINESS_ADMIN)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
 
   if (request.method === "POST") {
     const { email, role, code } = await request.json() as { email?: string; role?: string; code?: string };

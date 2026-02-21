@@ -9,6 +9,10 @@ import { toast } from "sonner";
 import { Loader2, UserPlus, Save, ScanLine } from "lucide-react";
 import { useFetcher } from "@remix-run/react";
 
+import { leadSchema, type LeadFormValues } from "~/utils/schemas";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
 interface ManualLeadFormProps {
   profileId: string;
 }
@@ -20,31 +24,34 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
   const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    notes: "",
-    source: "MANUAL" as "MANUAL" | "OCR",
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<LeadFormValues>({
+    resolver: zodResolver(leadSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      notes: "",
+    }
   });
+
+  const onSubmit = (data: LeadFormValues) => {
+    fetcher.submit(
+      { ...data, profileId, source: "MANUAL" },
+      { method: "post", action: "/api/leads" }
+    );
+  };
 
   useEffect(() => {
     const data = fetcher.data as { success?: boolean; error?: string } | undefined;
     if (fetcher.state === "idle" && data) {
       if (data.success) {
         toast.success("New lead captured!");
-        setFormData({
-          name: "",
-          email: "",
-          phone: "",
-          notes: "",
-          source: "MANUAL",
-        });
+        reset();
       } else if (data.error) {
         toast.error(data.error);
       }
     }
-  }, [fetcher.state, fetcher.data]);
+  }, [fetcher.state, fetcher.data, reset]);
 
   const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,14 +88,11 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
         }
       }
 
-      setFormData(prev => ({
-        ...prev,
-        name: name || prev.name,
-        email: email || prev.email,
-        phone: phone || prev.phone,
-        source: "OCR",
-        notes: prev.notes ? `${prev.notes}\n[OCR Scanned]` : "[OCR Scanned]",
-      }));
+      const currentValues = watch();
+      setValue("name", name || currentValues.name);
+      setValue("email", (email || currentValues.email) || "");
+      setValue("phone", phone || currentValues.phone);
+      setValue("notes", currentValues.notes ? `${currentValues.notes}\n[OCR Scanned]` : "[OCR Scanned]");
 
       toast.success("Card details extracted!", { id: toastId });
     } catch (error) {
@@ -97,19 +101,6 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
     } finally {
       setIsScanning(false);
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name) {
-      toast.error("At least a name is required.");
-      return;
-    }
-
-    fetcher.submit(
-      { ...formData, profileId, intent: "create-lead" },
-      { method: "post" }
-    );
   };
 
   return (
@@ -147,7 +138,7 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
             type="button" 
             variant="outline" 
             className="w-full h-20 flex flex-col gap-2 border-dashed border-2 hover:border-primary hover:bg-primary/5"
-            onClick={() => setFormData({ name: "", email: "", phone: "", notes: "", source: "MANUAL" })}
+            onClick={() => reset()}
             disabled={isSubmitting}
           >
              <UserPlus className="w-6 h-6 text-primary" />
@@ -155,16 +146,15 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Full Name *</Label>
             <Input 
               id="name" 
               placeholder="John Doe" 
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              required
+              {...register("name")}
             />
+            {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -174,9 +164,9 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
                 id="email" 
                 type="email" 
                 placeholder="john@example.com" 
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                {...register("email")}
               />
+              {errors.email && <p className="text-sm text-red-500">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
@@ -184,9 +174,9 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
                 id="phone" 
                 type="tel" 
                 placeholder="+1 234 567 890" 
-                value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                {...register("phone")}
               />
+              {errors.phone && <p className="text-sm text-red-500">{errors.phone.message}</p>}
             </div>
           </div>
 
@@ -196,9 +186,9 @@ export function ManualLeadForm({ profileId }: ManualLeadFormProps) {
               id="notes" 
               placeholder="Met at Tech Conference..." 
               className="resize-none"
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              {...register("notes")}
             />
+            {errors.notes && <p className="text-sm text-red-500">{errors.notes.message}</p>}
           </div>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>

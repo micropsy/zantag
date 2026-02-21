@@ -10,19 +10,19 @@ export function AdminUserTable({ users }: { users: { id: string; name: string | 
   const save = async (id: string) => {
     setLoadingId(id);
     const row = rows.find((u) => u.id === id)!;
-    await fetch("/api/admin/users/update", {
+    await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, name: row.name, email: row.email, role: row.role }),
+      body: JSON.stringify({ id, name: row.name, email: row.email, role: row.role, intent: "update" }),
     });
     setLoadingId(null);
   };
   const resetPassword = async (id: string) => {
     setLoadingId(id);
-    await fetch("/api/admin/users/reset-password", {
+    await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, intent: "reset-password" }),
     });
     setLoadingId(null);
   };
