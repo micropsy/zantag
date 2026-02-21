@@ -178,26 +178,24 @@ export default function DashboardProfile() {
   }, [profile]);
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setUsername(val);
-    
-    if (val.length >= 3 && val !== profile.username) {
-      setIsUsernameChecking(true);
-      // Debounce could be added here, but for now simple delay
-      const timer = setTimeout(() => {
-        usernameFetcher.load(`/api/check-username?username=${val}`);
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setIsUsernameChecking(false);
-    }
+    setUsername(e.target.value);
   };
 
   useEffect(() => {
-    if (usernameFetcher.state === "idle" && isUsernameChecking) {
+    // Don't check if username is empty or same as initial
+    if (!username || username.length < 3 || username === profile.username) {
       setIsUsernameChecking(false);
+      return;
     }
-  }, [usernameFetcher.state, isUsernameChecking]);
+
+    setIsUsernameChecking(true);
+    const timer = setTimeout(() => {
+      setIsUsernameChecking(false);
+      usernameFetcher.load(`/api/check-username?username=${username}`);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [username, profile.username, usernameFetcher]);
 
   const actionData = fetcher.data as { success?: boolean; errors?: Record<string, string[]> };
 
@@ -284,7 +282,7 @@ export default function DashboardProfile() {
                       }`}
                     />
                     <div className="absolute right-3 top-2.5">
-                       {isUsernameChecking ? (
+                       {isUsernameChecking || usernameFetcher.state !== "idle" ? (
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                        ) : username !== profile.username && isUsernameValid === true ? (
                           <Check className="h-4 w-4 text-green-500" />
