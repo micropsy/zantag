@@ -23,7 +23,6 @@ export async function uploadAsset(
 
   // Assuming R2 public access or worker proxy
   // Return the public URL or the key
-  // @ts-ignore
   const publicUrl = env.PUBLIC_ASSETS_URL || "";
   return `${publicUrl}/${key}`;
 }
@@ -51,12 +50,14 @@ export async function deleteUserFolder(context: AppLoadContext, shortCode: strin
     while (truncated) {
         const list = await env.BUCKET.list({ prefix, cursor });
         truncated = list.truncated;
-        // @ts-ignore
-        cursor = list.cursor as string | undefined;
+        if (list.truncated) {
+            cursor = list.cursor;
+        } else {
+            cursor = undefined;
+        }
 
-        const keys = list.objects.map((obj: any) => obj.key);
+        const keys = list.objects.map((obj) => obj.key);
         if (keys.length > 0) {
-            // @ts-ignore
             await env.BUCKET.delete(keys);
         }
     }

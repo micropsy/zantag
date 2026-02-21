@@ -83,7 +83,7 @@ export async function removeStaff(context: AppLoadContext, adminId: string, staf
 }
 
 // Finalize Separation (Hard Delete or Permanent Inactive)
-export async function finalizeSeparation(context: AppLoadContext, adminId: string, staffUserId: string) {
+export async function deleteStaffMember(context: AppLoadContext, adminId: string, staffUserId: string) {
   const db = getDb(context);
   const staff = await db.user.findUnique({ where: { id: staffUserId } });
   if (!staff) throw new Error("Staff not found");
@@ -95,15 +95,7 @@ export async function finalizeSeparation(context: AppLoadContext, adminId: strin
       where: { id: staffUserId }
     });
   } else {
-    // After 30 days: Permanent Inactive (Seat Occupied)
-    // Change Role to INDIVIDUAL, Keep Company Link (to consume seat), Set Status INACTIVE
-    return db.user.update({
-      where: { id: staffUserId },
-      data: {
-        role: UserRole.INDIVIDUAL,
-        status: "INACTIVE", // Seat still occupied
-        separatedAt: null // Clear timer
-      }
-    });
+    // After 30 days: Admin CANNOT delete
+    throw new Error("Staff member has passed the 30-day grace period and cannot be deleted. Seat remains occupied.");
   }
 }

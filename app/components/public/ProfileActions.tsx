@@ -7,17 +7,18 @@ import { toast } from "sonner";
 interface ProfileActionsProps {
   slug: string;
   name: string;
+  profileUrl: string; // Full relative URL e.g. /p/username or /b/company/username
 }
 
-export function ProfileActions({ slug, name }: ProfileActionsProps) {
+export function ProfileActions({ slug, name, profileUrl }: ProfileActionsProps) {
   const downloadVCard = () => {
     window.location.href = `/api/vcard?slug=${slug}`;
   };
 
   const baseUrl =
     (typeof window !== "undefined" ? window.location.origin : "");
-  const profileUrl =
-    baseUrl + `/p/${slug}`;
+  const fullProfileUrl =
+    baseUrl + profileUrl;
 
   const downloadQRCode = () => {
     const canvas = document.getElementById("qr-code-canvas") as HTMLCanvasElement;
@@ -43,7 +44,7 @@ export function ProfileActions({ slug, name }: ProfileActionsProps) {
         await (navigator as any).share({
           title: `${name}'s Profile`,
           text: `Check out ${name}'s digital business card on ZanTag!`,
-          url: profileUrl,
+          url: fullProfileUrl,
         });
       } catch {
         toast.error("Could not open native share.");
@@ -51,11 +52,11 @@ export function ProfileActions({ slug, name }: ProfileActionsProps) {
     } else {
       try {
         if (typeof window !== "undefined" && window.isSecureContext && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(profileUrl);
+          await navigator.clipboard.writeText(fullProfileUrl);
           toast.success("Profile link copied to clipboard!");
         } else {
           const textarea = document.createElement("textarea");
-          textarea.value = profileUrl;
+          textarea.value = fullProfileUrl;
           textarea.setAttribute("readonly", "");
           textarea.style.position = "absolute";
           textarea.style.left = "-9999px";
@@ -100,7 +101,7 @@ export function ProfileActions({ slug, name }: ProfileActionsProps) {
             <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-100">
               <QRCodeCanvas 
                 id="qr-code-canvas"
-                value={profileUrl} 
+                value={fullProfileUrl} 
                 size={240}
                 level="H"
                 includeMargin={true}

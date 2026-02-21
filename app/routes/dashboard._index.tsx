@@ -21,10 +21,12 @@ import {
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
+import { getDomainUrl } from "~/utils/helpers";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request);
   const db = getDb(context);
+  const domainUrl = getDomainUrl(request, context);
   
   const profile = await db.profile.findUnique({
     where: { userId },
@@ -33,6 +35,12 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
         select: {
           name: true,
           email: true,
+          role: true,
+        }
+      },
+      company: {
+        select: {
+          slug: true,
         }
       },
       contacts: {
@@ -50,7 +58,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
   return json({ 
     profile,
-    views: 124 // Mock data
+    views: 124, // Mock data
+    domainUrl
   });
 };
 
@@ -76,7 +85,7 @@ export function ErrorBoundary() {
 import { PageHeader } from "~/components/ui/page-header";
 
 export default function DashboardIndex() {
-  const { profile, views } = useLoaderData<typeof loader>();
+  const { profile, views, domainUrl } = useLoaderData<typeof loader>();
 
   if (!profile) {
     return (
@@ -154,6 +163,12 @@ export default function DashboardIndex() {
   // Safely access user name or fallback to displayName or generic
   // profile object structure: { ...profileFields, user: { name: string, email: string } }
   const userName = profile.user?.name || profile.displayName || "there";
+
+  // Calculate profile URL
+  const isBusinessStaff = profile.user?.role === "BUSINESS_STAFF" && profile.company?.slug;
+  const profileUrl = isBusinessStaff 
+    ? `${domainUrl}/b/${profile.company!.slug}/${profile.username}` 
+    : `${domainUrl}/p/${profile.username}`;
 
   return (
     <div className="space-y-8">
@@ -250,7 +265,7 @@ export default function DashboardIndex() {
                 </div>
               </Link>
               
-              <a href={`/${profile.username}`} target="_blank" rel="noopener noreferrer" className="block">
+              <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="block">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-100 group cursor-pointer">
                   <div className="p-2 bg-blue-100 rounded-md text-blue-600 group-hover:bg-blue-200 transition-colors">
                     <ArrowUpRight className="w-5 h-5" />

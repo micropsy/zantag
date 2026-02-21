@@ -17,6 +17,8 @@ declare global {
     INVITE_CODE_SECRET: string;
     RESEND_API_KEY: string;
     EMAIL_FROM: string;
+    APP_URL: string;
+    PUBLIC_ASSETS_URL?: string;
   }
 }
 

@@ -9,7 +9,7 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
   }
 
   try {
-    const destination = await resolveShortCode(context, shortCode);
+    const destination = await resolveShortCode(context, request, shortCode);
     
     if (!destination) {
       // Short code not found

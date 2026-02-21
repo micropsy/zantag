@@ -1,7 +1,7 @@
 import { type ActionFunctionArgs, json } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
 import { requireAdmin } from "~/utils/session.server";
-import { finalizeSeparation, removeStaff } from "~/services/business.server";
+import { deleteStaffMember, removeStaff } from "~/services/business.server";
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
   const currentUser = await requireAdmin(request, context);
@@ -51,7 +51,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         }
       }
 
-      await finalizeSeparation(context, currentUser.id, data.id);
+      await deleteStaffMember(context, currentUser.id, data.id);
       return json({ success: true, message: "User deleted successfully." });
     }
 
@@ -68,7 +68,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       // until the auth system is fully reviewed.
       // WAIT: The previous `api.admin.users.reset-password.ts` was empty/mocked?
       // Let's assume we just want to log it for now or return success.
-      console.log(`Password reset requested for user ${data.id} by admin ${currentUser.id}`);
+      // console.log(`Password reset requested for user ${data.id} by admin ${currentUser.id}`);
       return json({ success: true, message: "Password reset instructions sent (simulated)." });
     }
 

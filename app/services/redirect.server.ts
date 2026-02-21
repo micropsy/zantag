@@ -1,9 +1,11 @@
 import { type AppLoadContext } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
 import { UserRole } from "~/types";
+import { getDomainUrl } from "~/utils/helpers";
 
-export async function resolveShortCode(context: AppLoadContext, shortCode: string) {
+export async function resolveShortCode(context: AppLoadContext, request: Request, shortCode: string) {
   const db = getDb(context);
+  const domainUrl = getDomainUrl(request, context);
   const user = await db.user.findUnique({
     where: { shortCode },
     include: {
@@ -27,8 +29,8 @@ export async function resolveShortCode(context: AppLoadContext, shortCode: strin
   if (!username) return "/"; // Fallback
 
   if (user.role === UserRole.BUSINESS_STAFF && user.profile?.company?.slug) {
-    return `/b/${user.profile.company.slug}/${username}`;
+    return `${domainUrl}/b/${user.profile.company.slug}/${username}`;
   }
 
-  return `/p/${username}`;
+  return `${domainUrl}/p/${username}`;
 }

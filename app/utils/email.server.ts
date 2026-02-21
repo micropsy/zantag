@@ -85,7 +85,7 @@ const sendViaGmail = async (env: Env, options: EmailOptions) => {
   }
 
   const sendData = await sendResponse.json() as { id: string };
-  console.log("Message sent via Gmail API:", sendData.id);
+  // console.log("Message sent via Gmail API:", sendData.id);
   return sendData;
 };
 

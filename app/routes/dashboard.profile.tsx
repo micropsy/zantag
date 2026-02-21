@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher } from "@remix-run/react";
 import { useEffect } from "react";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
+import { getDomainUrl } from "~/utils/helpers";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -22,6 +23,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     where: { userId },
     include: {
       links: true,
+      user: { select: { role: true } },
+      company: { select: { slug: true } },
     },
   });
 
@@ -29,7 +32,9 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     return redirect("/dashboard");
   }
 
-  return json({ profile });
+  const domainUrl = getDomainUrl(request, context);
+
+  return json({ profile, domainUrl });
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
@@ -127,7 +132,12 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 import { PageHeader } from "~/components/ui/page-header";
 
 export default function DashboardProfile() {
-  const { profile } = useLoaderData<typeof loader>();
+  const { profile, domainUrl } = useLoaderData<typeof loader>();
+  const isBusinessStaff = profile.user.role === "BUSINESS_STAFF" && profile.company?.slug;
+  const publicUrl = isBusinessStaff 
+    ? `${domainUrl}/b/${profile.company!.slug}/${profile.username}` 
+    : `${domainUrl}/p/${profile.username}`;
+
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
 
@@ -185,7 +195,7 @@ export default function DashboardProfile() {
                 {actionData?.errors?.username && (
                   <p className="text-sm text-red-500">{actionData.errors.username[0]}</p>
                 )}
-                <p className="text-xs text-muted-foreground">This is your public URL: zantag.com/p/username</p>
+                <p className="text-xs text-muted-foreground">This is your public URL: {publicUrl}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
