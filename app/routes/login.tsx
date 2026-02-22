@@ -11,8 +11,8 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const userId = await getUserId(request);
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+  const userId = await getUserId(request, context);
   if (userId) return redirect("/dashboard");
   return json({});
 };
@@ -34,7 +34,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       return json({ error: "Invalid email or password" }, { status: 400 });
     }
 
-    return createUserSession(user.id, "/dashboard");
+    return createUserSession(user.id, "/dashboard", context);
   } catch (error) {
     console.error("Login error:", error);
     return json({ 

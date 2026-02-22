@@ -166,7 +166,7 @@ export default function DashboardIndex() {
 
   // Calculate profile URL
   // Use Master Link (Custom Username) as primary
-  const profileUrl = `${domainUrl}/${profile.username}`;
+  const profileUrl = `${domainUrl}/user/${profile.username}`;
 
   return (
     <div className="space-y-8">

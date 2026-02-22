@@ -10,33 +10,44 @@ type SessionFlashData = {
 };
 
 // Use a default secret for development if not provided
-const SESSION_SECRET = (typeof process !== "undefined" && process.env.SESSION_SECRET) || "super-secret-session-key"; 
+const DEFAULT_SECRET = "super-secret-session-key";
 
-export const sessionStorage = createCookieSessionStorage<SessionData, SessionFlashData>({
-  cookie: {
-    name: "__session",
-    httpOnly: true,
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-    path: "/",
-    sameSite: "lax",
-    secrets: [SESSION_SECRET], // In production, this should come from context.cloudflare.env
-    secure: true, // Always true for Cloudflare Pages
-  },
-});
-
-export async function getSession(request: Request) {
-  const cookie = request.headers.get("Cookie");
-  return sessionStorage.getSession(cookie);
+// Helper to get storage with context-aware secret
+function getSessionStorage(context?: AppLoadContext) {
+  // Try to get secret from context (Cloudflare)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const env = (context?.cloudflare as any)?.env || {};
+  const secret = env.SESSION_SECRET || (typeof process !== "undefined" && process.env.SESSION_SECRET) || DEFAULT_SECRET;
+  
+  return createCookieSessionStorage<SessionData, SessionFlashData>({
+    cookie: {
+      name: "__session",
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+      sameSite: "lax",
+      secrets: [secret],
+      secure: true, // Always true for Cloudflare Pages
+    },
+  });
 }
 
-export async function getUserId(request: Request) {
-  const session = await getSession(request);
+// Export for backward compatibility if needed, but prefer getSession(request, context)
+export const sessionStorage = getSessionStorage();
+
+export async function getSession(request: Request, context?: AppLoadContext) {
+  const cookie = request.headers.get("Cookie");
+  return getSessionStorage(context).getSession(cookie);
+}
+
+export async function getUserId(request: Request, context?: AppLoadContext) {
+  const session = await getSession(request, context);
   const userId = session.get("userId");
   return userId;
 }
 
 export async function getUser(request: Request, context: AppLoadContext) {
-  const userId = await getUserId(request);
+  const userId = await getUserId(request, context);
   if (typeof userId !== "string") {
     return null;
   }
@@ -50,8 +61,8 @@ export async function getUser(request: Request, context: AppLoadContext) {
   return user;
 }
 
-export async function requireUserId(request: Request, redirectTo: string = new URL(request.url).pathname) {
-  const userId = await getUserId(request);
+export async function requireUserId(request: Request, context?: AppLoadContext, redirectTo: string = new URL(request.url).pathname) {
+  const userId = await getUserId(request, context);
   if (!userId) {
     const searchParams = new URLSearchParams([["redirectTo", redirectTo]]);
     throw redirect(`/login?${searchParams}`);
@@ -60,7 +71,7 @@ export async function requireUserId(request: Request, redirectTo: string = new U
 }
 
 export async function requireUser(request: Request, context: AppLoadContext) {
-  const userId = await requireUserId(request);
+  const userId = await requireUserId(request, context);
   const db = getDb(context);
   const user = await db.user.findUnique({
     where: { id: userId },
@@ -71,7 +82,7 @@ export async function requireUser(request: Request, context: AppLoadContext) {
   });
 
   if (!user) {
-    throw await logout(request);
+    throw await logout(request, context);
   }
 
   return user;
@@ -93,23 +104,21 @@ export async function requireSuperAdmin(request: Request, context: AppLoadContex
   return user;
 }
 
-export async function createUserSession(userId: string, redirectTo: string) {
-  const session = await sessionStorage.getSession();
+export async function createUserSession(userId: string, redirectTo: string, context?: AppLoadContext) {
+  const session = await getSessionStorage(context).getSession();
   session.set("userId", userId);
   return redirect(redirectTo, {
     headers: {
-      "Set-Cookie": await sessionStorage.commitSession(session, {
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-      }),
+      "Set-Cookie": await getSessionStorage(context).commitSession(session),
     },
   });
 }
 
-export async function logout(request: Request) {
-  const session = await getSession(request);
-  return redirect("/login", {
+export async function logout(request: Request, context?: AppLoadContext) {
+  const session = await getSession(request, context);
+  return redirect("/", {
     headers: {
-      "Set-Cookie": await sessionStorage.destroySession(session),
+      "Set-Cookie": await getSessionStorage(context).destroySession(session),
     },
   });
 }

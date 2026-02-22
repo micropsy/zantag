@@ -57,6 +57,10 @@ model Profile {
   displayName     String?
   bio             String?
   avatarUrl       String?
+  bannerUrl       String?
+  position        String?
+  department      String?
+  companyName     String?
   companyId       String?
   isLockedByAdmin Boolean       @default(false)
   primaryColor    String?       @default("#0F172A")
@@ -81,7 +85,8 @@ model Link {
   title     String
   url       String
   icon      String?
-  type      String   @default("SOCIAL")
+  type      String   @default("SOCIAL") // SOCIAL, PHONE, EMAIL, WEBSITE, LOCATION
+  category  String   @default("PERSONAL") // PERSONAL, OFFICE
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)

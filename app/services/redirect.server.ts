@@ -1,6 +1,5 @@
 import { type AppLoadContext } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
-import { UserRole } from "~/types";
 import { getDomainUrl } from "~/utils/helpers";
 
 export async function resolveShortCode(context: AppLoadContext, request: Request, shortCode: string) {
@@ -28,9 +27,7 @@ export async function resolveShortCode(context: AppLoadContext, request: Request
   const username = user.profile?.username;
   if (!username) return "/"; // Fallback
 
-  if (user.role === UserRole.BUSINESS_STAFF && user.profile?.company?.slug && user.status === "ACTIVE") {
-    return `${domainUrl}/b/${user.profile.company.slug}/${username}`;
-  }
-
-  return `${domainUrl}/p/${username}`;
+  // Redirect to the Master Link (/user/:username)
+  // This route will handle the Dynamic Switch (to /p/ or /b/)
+  return `${domainUrl}/user/${username}`;
 }

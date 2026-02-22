@@ -20,6 +20,7 @@ declare global {
     APP_URL: string;
     SESSION_SECRET: string;
     PUBLIC_ASSETS_URL?: string;
+    R2_PUBLIC_URL?: string;
   }
 }
 

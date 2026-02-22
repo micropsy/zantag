@@ -1,12 +1,12 @@
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useLoaderData } from "@remix-run/react";
 import { type LoaderFunctionArgs, json, redirect } from "@remix-run/cloudflare";
 import { getProfileByUsername } from "~/services/user.server";
-import { UserRole } from "~/types";
 import { Avatar, AvatarImage, AvatarFallback } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Globe, Mail, FileText, Download, Phone, MapPin, Link as LinkIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { Globe, Mail, FileText, Download, Phone, MapPin, Link as LinkIcon, Building, User, Share2 } from "lucide-react";
 import { ConnectDialog } from "~/components/public/ConnectDialog";
 
 export const loader = async ({ params, context }: LoaderFunctionArgs) => {
@@ -21,56 +21,121 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   if (!profile) {
     throw new Response("Profile not found", { status: 404 });
   }
-
-  // If user is BUSINESS_STAFF, verify they are accessed via correct company slug?
-  // Actually, this route is for INDIVIDUAL (/p/$username).
-  // If a business staff is accessed here, should we redirect to company URL?
-  // Or just show profile?
-  // The requirement says: "Role-based Redirection: /c/:shortCode must trigger a logic that redirects to /p/:username (Individual) or /:company_shortname/:username (Business Staff)."
-  // It implies that Business Staff SHOULD be at /:company/:username.
-  // But if someone manually types /p/:username for a staff, maybe we should redirect them to correct URL?
   
-  if (profile.user.role === UserRole.BUSINESS_STAFF && profile.company) {
-    return redirect(`/${profile.company.slug}/${profile.username}`);
-  }
-
+  // If user is BUSINESS_STAFF, they should ideally be at /:company/:username
+  // But we allow access here for now or redirect if needed.
+  // For now, we'll render the profile.
+  
   return json({ profile });
 };
 
 export default function IndividualProfile() {
-  const { profile } = useLoaderData<typeof loader>();
+  const { profile } = useLoaderData<typeof loader>() as { profile: any };
   const { user, links, documents } = profile;
 
+  // Helper to get icon
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "PHONE": return <Phone className="h-5 w-5" />;
+      case "EMAIL": return <Mail className="h-5 w-5" />;
+      case "WEBSITE": return <Globe className="h-5 w-5" />;
+      case "LOCATION": return <MapPin className="h-5 w-5" />;
+      case "SOCIAL": return <Share2 className="h-5 w-5" />;
+      default: return <LinkIcon className="h-5 w-5" />;
+    }
+  };
+
+  // Helper to render links list
+  const renderLinks = (category: string) => {
+    // Filter links by category
+    // Note: Old links might not have category, default to PERSONAL if missing?
+    // The migration added default 'PERSONAL'.
+    const categoryLinks = links.filter((l: any) => (l.category || "PERSONAL") === category);
+    
+    if (categoryLinks.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          No contact information available.
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {categoryLinks.map((link: any) => (
+          <a 
+            key={link.id} 
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center p-3 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 transition-colors group shadow-sm"
+          >
+            <div className="bg-slate-100 p-2 rounded-full mr-3 text-slate-600 group-hover:text-primary group-hover:bg-primary/10 transition-colors">
+              {getIcon(link.type)}
+            </div>
+            <div className="flex-1 min-w-0">
+               {link.title && <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{link.title}</p>}
+               <p className="font-medium text-slate-900 truncate">{link.url.replace(/^mailto:|tel:/, '')}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-slate-200">
-        <CardHeader className="flex flex-col items-center space-y-4 pb-2">
-          <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
-            <AvatarImage src={profile.avatarUrl || ""} alt={profile.displayName || user.name || ""} />
-            <AvatarFallback className="text-2xl bg-slate-200 text-slate-600">
-              {(profile.displayName || user.name || "U").charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="text-center space-y-1">
-            <CardTitle className="text-2xl font-bold text-slate-900">
-              {profile.displayName || user.name}
-            </CardTitle>
-            {profile.bio && (
-              <CardDescription className="text-slate-600 font-medium">
-                {profile.bio}
-              </CardDescription>
-            )}
-             <Badge variant="secondary" className="mt-2">
-                Individual
-             </Badge>
-          </div>
-        </CardHeader>
+    <div className="min-h-screen bg-slate-100 flex justify-center">
+      <div className="w-full max-w-md bg-white min-h-screen shadow-2xl relative pb-20">
         
-        <CardContent className="space-y-6 pt-4">
+        {/* Banner */}
+        <div className="h-48 bg-slate-900 relative">
+          {profile.bannerUrl ? (
+            <img src={profile.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-r from-slate-800 to-slate-900 flex items-center justify-center">
+               <span className="text-slate-700 font-bold text-4xl opacity-20 select-none">ZanTag</span>
+            </div>
+          )}
+        </div>
+
+        {/* Profile Header */}
+        <div className="px-6 relative">
+          <div className="flex justify-between items-end -mt-16 mb-4">
+             <Avatar className="h-32 w-32 border-4 border-white shadow-xl bg-white">
+               <AvatarImage src={profile.avatarUrl || ""} alt={profile.displayName || user.name || ""} className="object-cover" />
+               <AvatarFallback className="text-4xl bg-slate-100 text-slate-400">
+                 {(profile.displayName || user.name || "U").charAt(0).toUpperCase()}
+               </AvatarFallback>
+             </Avatar>
+             
+             {/* Share Button (Optional) */}
+             {/* <Button variant="outline" size="icon" className="rounded-full bg-white/80 backdrop-blur-sm border-white/50 shadow-sm">
+                <Share2 className="h-5 w-5 text-slate-700" />
+             </Button> */}
+          </div>
+
+          <div className="space-y-1 mb-6">
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+              {profile.displayName || user.name}
+            </h1>
+            
+            {(profile.position || profile.department) && (
+              <p className="text-slate-600 font-medium text-lg">
+                {[profile.position, profile.department].filter(Boolean).join(" • ")}
+              </p>
+            )}
+            
+            {profile.companyName && (
+              <p className="text-slate-500 flex items-center gap-1.5">
+                <Building className="h-4 w-4" />
+                {profile.companyName}
+              </p>
+            )}
+          </div>
+
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <Button className="w-full bg-slate-900 hover:bg-slate-800" asChild>
+          <div className="grid grid-cols-2 gap-3 mb-8">
+            <Button className="w-full bg-slate-900 hover:bg-slate-800 shadow-md transition-all hover:shadow-lg" asChild>
               <a href={`/api/vcard/${profile.username}`} download>
                 <Download className="mr-2 h-4 w-4" />
                 Save Contact
@@ -82,84 +147,69 @@ export default function IndividualProfile() {
             />
           </div>
 
-          {/* Contact Info */}
-          <div className="space-y-3">
-             {profile.publicEmail && (
-               <a href={`mailto:${profile.publicEmail}`} className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg hover:bg-slate-200 transition-colors">
-                 <Mail className="h-5 w-5 text-slate-400" />
-                 <span className="text-sm font-medium">{profile.publicEmail}</span>
-               </a>
-             )}
-             {profile.publicPhone && (
-               <a href={`tel:${profile.publicPhone}`} className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg hover:bg-slate-200 transition-colors">
-                 <Phone className="h-5 w-5 text-slate-400" />
-                 <span className="text-sm font-medium">{profile.publicPhone}</span>
-               </a>
-             )}
-             {profile.website && (
-               <a href={profile.website} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg hover:bg-slate-200 transition-colors">
-                 <LinkIcon className="h-5 w-5 text-slate-400" />
-                 <span className="text-sm font-medium truncate">{profile.website.replace(/^https?:\/\//, '')}</span>
-               </a>
-             )}
-             {profile.location && (
-               <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.location)}`} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-3 text-slate-600 bg-slate-100 p-3 rounded-lg hover:bg-slate-200 transition-colors">
-                 <MapPin className="h-5 w-5 text-slate-400" />
-                 <span className="text-sm font-medium">{profile.location}</span>
-               </a>
-             )}
-          </div>
-
-          {/* Links */}
-          {links.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Links</h3>
-              <div className="grid gap-2">
-                {links.map((link) => (
-                  <a 
-                    key={link.id} 
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
-                  >
-                    <div className="bg-blue-50 p-2 rounded-md mr-3 group-hover:bg-blue-100 transition-colors">
-                      <Globe className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <span className="font-medium text-slate-700">{link.title}</span>
-                  </a>
-                ))}
-              </div>
+          {/* Bio */}
+          {profile.bio && (
+            <div className="mb-8 p-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-600 leading-relaxed text-sm">
+               {profile.bio}
             </div>
           )}
 
-          {/* Documents */}
+          {/* Contact Information Tabs */}
+          <div className="mb-8">
+             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Contact Information</h2>
+             <Tabs defaultValue="OFFICE" className="w-full">
+               <TabsList className="grid w-full grid-cols-2 mb-6 p-1 bg-slate-100 rounded-xl">
+                 <TabsTrigger value="OFFICE" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary py-2.5">
+                   <Building className="h-4 w-4 mr-2" /> Office
+                 </TabsTrigger>
+                 <TabsTrigger value="PERSONAL" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary py-2.5">
+                   <User className="h-4 w-4 mr-2" /> Personal
+                 </TabsTrigger>
+               </TabsList>
+               
+               <TabsContent value="OFFICE" className="animate-in fade-in slide-in-from-left-2 duration-300">
+                 {renderLinks("OFFICE")}
+               </TabsContent>
+               <TabsContent value="PERSONAL" className="animate-in fade-in slide-in-from-right-2 duration-300">
+                 {renderLinks("PERSONAL")}
+               </TabsContent>
+             </Tabs>
+          </div>
+
+          {/* Documents Section */}
           {documents.length > 0 && (
-             <div className="space-y-3">
-               <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Documents</h3>
-               <div className="grid gap-2">
-                 {documents.map((doc) => (
-                   <a 
-                     key={doc.id}
+             <div className="mb-8">
+             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Documents</h2>
+              <div className="space-y-3">
+                {documents.map((doc: any) => (
+                  <a 
+                    key={doc.id}
                      href={doc.url}
                      target="_blank"
                      rel="noopener noreferrer"
-                     className="flex items-center p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                     className="flex items-center p-4 rounded-xl border border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/50 transition-all shadow-sm group"
                    >
-                     <FileText className="h-5 w-5 text-orange-500 mr-3" />
-                     <span className="font-medium text-slate-700 truncate">{doc.title}</span>
+                     <div className="bg-orange-100 p-2.5 rounded-full mr-4 text-orange-600 group-hover:scale-110 transition-transform">
+                       <FileText className="h-5 w-5" />
+                     </div>
+                     <span className="font-medium text-slate-700 truncate flex-1">{doc.title}</span>
+                     <Download className="h-4 w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                    </a>
                  ))}
                </div>
              </div>
           )}
-          
-          <div className="pt-4 text-center">
-             <p className="text-xs text-slate-400">Powered by ZanTag</p>
-          </div>
 
-        </CardContent>
-      </Card>
+          {/* Branding Footer */}
+          <div className="mt-12 mb-6 text-center">
+             <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-slate-100 text-xs font-medium text-slate-500">
+               <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+               Powered by ZanTag
+             </div>
+          </div>
+          
+        </div>
+      </div>
     </div>
   );
 }
