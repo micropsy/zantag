@@ -20,7 +20,7 @@ export const loader = async ({ params, request, context }: LoaderFunctionArgs) =
       company: { select: { slug: true, name: true } }
     },
   }) as (Profile & {
-    links: Link[];
+    links: (Link & { category?: string | null })[];
     user: User;
     company: { slug: string; name: string } | null;
     companyName?: string | null;
