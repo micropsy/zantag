@@ -16,6 +16,7 @@ export default [
       "**/temp_reference/**",
       "**/temp_zantag_vercel/**",
       "**/functions/**",
+      "**/dist-worker/**",
       ".env",
       ".DS_Store"
     ]

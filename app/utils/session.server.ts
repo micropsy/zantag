@@ -17,7 +17,12 @@ function getSessionStorage(context?: AppLoadContext) {
   // Try to get secret from context (Cloudflare)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const env = (context?.cloudflare as any)?.env || {};
-  const secret = env.SESSION_SECRET || (typeof process !== "undefined" && process.env.SESSION_SECRET) || DEFAULT_SECRET;
+  
+  // Safely check for process.env
+  const processEnv = typeof process !== "undefined" ? process.env : {};
+  
+  const secret = env.SESSION_SECRET || processEnv.SESSION_SECRET || DEFAULT_SECRET;
+  const isProduction = processEnv.NODE_ENV === "production";
   
   return createCookieSessionStorage<SessionData, SessionFlashData>({
     cookie: {
@@ -27,7 +32,7 @@ function getSessionStorage(context?: AppLoadContext) {
       path: "/",
       sameSite: "lax",
       secrets: [secret],
-      secure: process.env.NODE_ENV === "production", // Only secure in production
+      secure: isProduction, // Only secure in production
     },
   });
 }
