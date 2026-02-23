@@ -6,10 +6,11 @@ import { LandingHeader } from "~/components/LandingHeader";
 import { getUser } from "~/utils/session.server";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
+import { isInvitationOnlyMode } from "~/utils/settings.server";
+
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const user = await getUser(request, context);
-  // For now, hardcode invitation only mode as requested
-  const isInvitationOnly = true; 
+  const isInvitationOnly = await isInvitationOnlyMode(context);
   return json({ user, isInvitationOnly });
 };
 
@@ -33,7 +34,7 @@ export default function Index() {
           <div className="flex flex-col sm:flex-row gap-4">
             <Link to={isInvitationOnly ? "/signup" : "/signup"}>
               <Button size="lg" className="bg-[#0F172A] hover:bg-slate-800 text-white px-8 h-14 text-lg">
-                {isInvitationOnly ? "Redeem Invitation" : "Create Your Card Now"} <ArrowRight className="ml-2 h-5 w-5" />
+                {isInvitationOnly ? "Redeem Invitation" : "Get Started"} <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             {isInvitationOnly && (

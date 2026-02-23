@@ -1,5 +1,5 @@
 import { type ActionFunctionArgs, json, redirect, type LoaderFunctionArgs } from "@remix-run/cloudflare";
-import { Form, useActionData, useNavigation, Link, useSearchParams } from "@remix-run/react";
+import { Form, useActionData, useNavigation, Link, useSearchParams, useLoaderData } from "@remix-run/react";
 import { getDb } from "~/utils/db.server";
 import { sendEmail } from "~/utils/email.server";
 import { getVerifyEmailHtml } from "~/components/email/templates";
@@ -15,10 +15,14 @@ import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 import { createUser } from "~/services/user.server";
 
+import { isInvitationOnlyMode } from "~/utils/settings.server";
+
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await getUserId(request, context);
   if (userId) return redirect("/dashboard");
-  return json({});
+  
+  const isInvitationOnly = await isInvitationOnlyMode(context);
+  return json({ isInvitationOnly });
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
@@ -27,13 +31,21 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const password = formData.get("password");
   const inviteCode = formData.get("inviteCode");
 
+  const isInvitationOnly = await isInvitationOnlyMode(context);
+
   if (
     typeof email !== "string" ||
-    typeof password !== "string" ||
-    typeof inviteCode !== "string"
+    typeof password !== "string"
   ) {
     return json(
-      { error: "Email, Password, and Invite Code are required." },
+      { error: "Email and Password are required." },
+      { status: 400 }
+    );
+  }
+
+  if (isInvitationOnly && typeof inviteCode !== "string") {
+    return json(
+      { error: "Invite Code is required." },
       { status: 400 }
     );
   }
@@ -41,17 +53,19 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const db = getDb(context);
 
   try {
-    // 1. Verify Invite Code
-    const validCode = await db.inviteCode.findUnique({
-      where: { code: inviteCode },
-    });
+    // 1. Verify Invite Code if in Invitation Only Mode
+    if (isInvitationOnly && inviteCode) {
+      const validCode = await db.inviteCode.findUnique({
+        where: { code: inviteCode as string },
+      });
 
-    if (!validCode) {
-      return json({ error: "Invalid invite code." }, { status: 400 });
-    }
+      if (!validCode) {
+        return json({ error: "Invalid invite code." }, { status: 400 });
+      }
 
-    if (validCode.isUsed) {
-      return json({ error: "Invite code has already been used." }, { status: 400 });
+      if (validCode.isUsed) {
+        return json({ error: "Invite code has already been used." }, { status: 400 });
+      }
     }
 
     // 2. Check if email already exists
@@ -73,7 +87,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     const newUser = await createUser(context, {
       email,
       passwordHash: hashedPassword,
-      inviteCode
+      inviteCode: isInvitationOnly ? (inviteCode as string) : undefined
     });
     
     // Update verification token (since createUser doesn't set it)
@@ -82,14 +96,16 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       data: { verificationToken }
     });
 
-    // 4. Mark invite code as used
-    await db.inviteCode.update({
-      where: { code: inviteCode },
-      data: {
-        isUsed: true,
-        userId: newUser.id,
-      },
-    });
+    // 4. Mark invite code as used if applicable
+    if (isInvitationOnly && inviteCode) {
+      await db.inviteCode.update({
+        where: { code: inviteCode as string },
+        data: {
+          isUsed: true,
+          userId: newUser.id,
+        },
+      });
+    }
 
     // 5. Send Verification Email
     const verifyUrl = `${new URL(request.url).origin}/verify?token=${verificationToken}`;
@@ -113,6 +129,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 };
 
 export default function Signup() {
+  const { isInvitationOnly } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -144,17 +161,19 @@ export default function Signup() {
           </div>
 
           <Form method="post" className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="inviteCode">Invite Code</Label>
-              <Input
-                id="inviteCode"
-                name="inviteCode"
-                required
-                defaultValue={defaultInviteCode}
-                placeholder="Enter your invite code"
-                className="bg-slate-50 border-slate-200"
-              />
-            </div>
+            {isInvitationOnly && (
+              <div className="space-y-2">
+                <Label htmlFor="inviteCode">Invite Code</Label>
+                <Input
+                  id="inviteCode"
+                  name="inviteCode"
+                  required
+                  defaultValue={defaultInviteCode}
+                  placeholder="Enter your invite code"
+                  className="bg-slate-50 border-slate-200"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

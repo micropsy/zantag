@@ -46,6 +46,17 @@ async function main() {
   
   console.log(`Created admin user: ${admin.email}`);
 
+  // Create System Settings
+  await prisma.systemSetting.upsert({
+    where: { key: 'invitationOnly' },
+    update: {},
+    create: {
+      key: 'invitationOnly',
+      value: 'false',
+    },
+  });
+  console.log('System settings seeded.');
+
   console.log('Seeding finished.');
 }
 
