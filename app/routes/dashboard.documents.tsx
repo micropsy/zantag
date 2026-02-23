@@ -34,7 +34,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  const userId = await requireUserId(request);
+  const userId = await requireUserId(request, context);
   const db = getDb(context);
   const bucket = context.cloudflare.env.BUCKET;
 

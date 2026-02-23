@@ -7,7 +7,7 @@ import { ManualLeadForm } from "~/components/dashboard/ManualLeadForm";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
+  const userId = await requireUserId(request, context);
   const db = getDb(context);
   
   const profile = await db.profile.findUnique({

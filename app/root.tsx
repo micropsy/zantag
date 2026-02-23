@@ -1,4 +1,4 @@
-import type { LinksFunction } from "@remix-run/cloudflare";
+import type { LinksFunction, MetaFunction } from "@remix-run/cloudflare";
 import {
   Links,
   LiveReload,
@@ -9,7 +9,16 @@ import {
   isRouteErrorResponse,
   useRouteError,
 } from "@remix-run/react";
+import { Toaster } from "sonner";
 import styles from "./styles/tailwind.css?url";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "ZanTag" },
+    { charset: "utf-8" },
+    { name: "viewport", content: "width=device-width, initial-scale=1" },
+  ];
+};
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: styles },
@@ -27,6 +36,7 @@ export default function App() {
       </head>
       <body>
         <Outlet />
+        <Toaster richColors position="top-center" />
         <ScrollRestoration />
         <Scripts />
         <LiveReload />

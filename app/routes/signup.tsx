@@ -15,8 +15,8 @@ import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 import { createUser } from "~/services/user.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const userId = await getUserId(request);
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+  const userId = await getUserId(request, context);
   if (userId) return redirect("/dashboard");
   return json({});
 };
@@ -130,6 +130,12 @@ export default function Signup() {
       {/* Left Side - Form */}
       <div className="flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm space-y-8">
+          <div className="flex justify-center lg:justify-start">
+            <Link to="/" className="flex items-center gap-2">
+              <img src="/logo.png" alt="ZanTag Logo" className="w-8 h-8 rounded-lg" />
+              <span className="text-xl font-bold text-slate-900">ZanTag</span>
+            </Link>
+          </div>
           <div className="space-y-2 text-center lg:text-left">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Create an account</h1>
             <p className="text-slate-500">
@@ -204,9 +210,6 @@ export default function Signup() {
       <div className="hidden lg:flex flex-col justify-center p-12 bg-slate-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center opacity-20"></div>
         <div className="relative z-10 max-w-lg">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center mb-8 border border-white/20">
-            <div className="font-bold text-2xl text-white">Z</div>
-          </div>
           <blockquote className="space-y-6">
             <p className="text-2xl font-medium leading-relaxed">
               &ldquo;The best way to predict the future is to create it. Join a community of forward-thinking professionals.&rdquo;

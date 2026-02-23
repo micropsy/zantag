@@ -24,7 +24,7 @@ import { requireUserId } from "~/utils/session.server";
 import { getDomainUrl } from "~/utils/helpers";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
+  const userId = await requireUserId(request, context);
   const db = getDb(context);
   const domainUrl = getDomainUrl(request, context);
   

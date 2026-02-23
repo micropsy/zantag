@@ -11,6 +11,7 @@
     "dev": "remix vite:dev",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "wrangler pages dev ./build/client",
+    "preview:remote": "npm run build && wrangler pages dev ./build/client",
     "typecheck": "tsc",
     "preview": "npm run start"
   },

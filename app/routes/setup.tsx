@@ -7,7 +7,7 @@ import { profileSchema } from "~/utils/schemas";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
-  const userId = await requireUserId(request);
+  const userId = await requireUserId(request, context);
   const db = getDb(context);
 
   const profile = await db.profile.findUnique({
@@ -22,7 +22,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  const userId = await requireUserId(request);
+  const userId = await requireUserId(request, context);
   const formData = await request.formData();
   
   const rawData = {

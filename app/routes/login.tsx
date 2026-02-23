@@ -1,6 +1,6 @@
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/cloudflare";
 import { Form, useActionData, useNavigation, Link, useSearchParams } from "@remix-run/react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { getDb } from "~/utils/db.server";
 import { createUserSession, getUserId } from "~/utils/session.server";
 import { compare } from "bcrypt-ts";
@@ -18,22 +18,39 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
+  console.log("Login action started");
   try {
     const formData = await request.formData();
     const email = formData.get("email");
     const password = formData.get("password");
 
     if (typeof email !== "string" || typeof password !== "string") {
+      console.log("Invalid form data");
       return json({ error: "Invalid form data" }, { status: 400 });
     }
 
+    console.log(`Attempting login for email: ${email}`);
     const db = getDb(context);
+    console.log("DB connection established");
+    
     const user = await db.user.findUnique({ where: { email } });
+    console.log(`User found: ${!!user}`);
 
-    if (!user || !(await compare(password, user.password))) {
-      return json({ error: "Invalid email or password" }, { status: 400 });
+    if (!user) {
+      console.log("User not found");
+      return json({ error: "Account not found. Please sign up first." }, { status: 400 });
     }
 
+    console.log("Verifying password...");
+    const isCorrectPassword = await compare(password, user.password);
+    console.log(`Password correct: ${isCorrectPassword}`);
+    
+    if (!isCorrectPassword) {
+      console.log("Incorrect password");
+      return json({ error: "Incorrect password. Please try again." }, { status: 400 });
+    }
+
+    console.log("Creating session...");
     return createUserSession(user.id, "/dashboard", context);
   } catch (error) {
     console.error("Login error:", error);
@@ -64,6 +81,12 @@ export default function Login() {
       {/* Left Side - Form */}
       <div className="flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm space-y-8">
+          <div className="flex justify-center lg:justify-start">
+            <Link to="/" className="flex items-center gap-2">
+              <img src="/logo.png" alt="ZanTag Logo" className="w-8 h-8 rounded-lg" />
+              <span className="text-xl font-bold text-slate-900">ZanTag</span>
+            </Link>
+          </div>
           <div className="space-y-2 text-center lg:text-left">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Welcome back</h1>
             <p className="text-slate-500">
@@ -72,6 +95,21 @@ export default function Login() {
           </div>
 
           <Form method="post" className="space-y-6">
+            {actionData?.error && (
+              <div className="rounded-md bg-red-50 p-4 border border-red-200">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Error</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <p>{actionData.error}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -134,9 +172,6 @@ export default function Login() {
       <div className="hidden lg:flex flex-col justify-center p-12 bg-slate-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=2074&q=80')] bg-cover bg-center opacity-20"></div>
         <div className="relative z-10 max-w-lg">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center mb-8 border border-white/20">
-            <div className="font-bold text-2xl text-white">Z</div>
-          </div>
           <blockquote className="space-y-6">
             <p className="text-2xl font-medium leading-relaxed">
               &quot;ZanTag has completely transformed how I network. The digital business card is sleek, professional, and always makes a great first impression.&quot;

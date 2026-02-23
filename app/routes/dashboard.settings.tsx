@@ -12,16 +12,18 @@ import { Lock, LogOut } from "lucide-react";
 import { compare, hash } from "bcrypt-ts";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await requireUserId(request);
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+  await requireUserId(request, context);
   return json({});
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  const userId = await requireUserId(request);
+  console.log("Settings action started");
+  const userId = await requireUserId(request, context);
   const db = getDb(context);
   const formData = await request.formData();
   const intent = formData.get("intent");
+  console.log(`Settings action intent: ${intent}`);
 
   if (intent === "change-password") {
     const currentPassword = formData.get("currentPassword") as string;
@@ -29,14 +31,17 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     const confirmPassword = formData.get("confirmPassword") as string;
 
     if (!currentPassword || !newPassword || !confirmPassword) {
+      console.log("Missing password fields");
       return json({ error: "All fields are required" }, { status: 400 });
     }
 
     if (newPassword !== confirmPassword) {
+      console.log("New passwords do not match");
       return json({ error: "New passwords do not match" }, { status: 400 });
     }
 
     if (newPassword.length < 6) {
+      console.log("Password too short");
       return json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
@@ -45,21 +50,26 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     });
 
     if (!user) {
+      console.log("User not found for password change");
       return json({ error: "User not found" }, { status: 404 });
     }
 
+    console.log("Verifying current password...");
     const isValid = await compare(currentPassword, user.password);
+    console.log(`Current password valid: ${isValid}`);
 
     if (!isValid) {
       return json({ error: "Incorrect current password" }, { status: 400 });
     }
 
     const hashedPassword = await hash(newPassword, 10);
+    console.log("Hashing new password and updating DB...");
 
     await db.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
+    console.log("Password updated successfully");
 
     return json({ success: true });
   }
