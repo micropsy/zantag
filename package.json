@@ -13,7 +13,10 @@
     "start": "wrangler pages dev ./build/client",
     "preview:remote": "npm run build && wrangler pages dev ./build/client",
     "typecheck": "tsc",
-    "preview": "npm run start"
+    "preview": "npm run start",
+    "db:migrate": "npx prisma migrate dev",
+    "db:push": "npx prisma db push",
+    "db:studio": "npx prisma studio"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
