@@ -15,7 +15,10 @@ export async function loader({ context, params }: LoaderFunctionArgs) {
   }
 
   const headers = new Headers();
-  object.writeHttpMetadata(headers);
+  const metadata = object.httpMetadata as { contentType?: string } | null;
+  if (metadata?.contentType) {
+    headers.set("Content-Type", metadata.contentType);
+  }
   headers.set("etag", object.httpEtag);
   headers.set("Cache-Control", "public, max-age=31536000");
 

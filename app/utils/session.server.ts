@@ -82,7 +82,6 @@ export async function requireUser(request: Request, context: AppLoadContext) {
     where: { id: userId },
     include: {
       profile: true,
-      inviteCode: true,
     },
   });
 

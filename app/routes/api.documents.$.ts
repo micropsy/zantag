@@ -19,7 +19,10 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   }
 
   const headers = new Headers();
-  object.writeHttpMetadata(headers);
+  const metadata = object.httpMetadata as { contentType?: string } | null;
+  if (metadata?.contentType) {
+    headers.set("Content-Type", metadata.contentType);
+  }
   headers.set("etag", object.httpEtag);
 
   return new Response(object.body, {

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Globe, Mail, FileText, Download, Phone, MapPin, Link as LinkIcon, Building, User, Share2 } from "lucide-react";
 import { ConnectDialog } from "~/components/public/ConnectDialog";
 
-export const loader = async ({ params, context }: LoaderFunctionArgs) => {
+export const loader = async ({ params, context, request }: LoaderFunctionArgs) => {
   const { username } = params;
 
   if (!username) {
@@ -21,16 +21,17 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   if (!profile) {
     throw new Response("Profile not found", { status: 404 });
   }
-  
-  // If user is BUSINESS_STAFF, they should ideally be at /:company/:username
-  // But we allow access here for now or redirect if needed.
-  // For now, we'll render the profile.
-  
-  return json({ profile });
+
+  const userAgent = request.headers.get("User-Agent") || "";
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+
+  const mapProvider: "apple" | "google" = isIOS ? "apple" : "google";
+
+  return json({ profile, mapProvider });
 };
 
 export default function IndividualProfile() {
-  const { profile } = useLoaderData<typeof loader>() as { profile: any };
+  const { profile, mapProvider } = useLoaderData<typeof loader>() as { profile: any; mapProvider: "apple" | "google" };
   const { user, links, documents } = profile;
 
   // Helper to get icon
@@ -42,6 +43,51 @@ export default function IndividualProfile() {
       case "LOCATION": return <MapPin className="h-5 w-5" />;
       case "SOCIAL": return <Share2 className="h-5 w-5" />;
       default: return <LinkIcon className="h-5 w-5" />;
+    }
+  };
+
+  const buildHref = (link: any) => {
+    const raw = (link.url || "").trim();
+
+    if (!raw) return "#";
+
+    switch (link.type) {
+      case "PHONE": {
+        const phone = raw.replace(/^tel:/i, "");
+        return `tel:${phone}`;
+      }
+      case "EMAIL": {
+        const email = raw.replace(/^mailto:/i, "");
+        return `mailto:${email}`;
+      }
+      case "WEBSITE": {
+        if (/^https?:\/\//i.test(raw)) return raw;
+        return `https://${raw}`;
+      }
+      case "LOCATION": {
+        const query = encodeURIComponent(raw);
+        if (mapProvider === "apple") {
+          return `https://maps.apple.com/?q=${query}`;
+        }
+        return `https://www.google.com/maps/search/?api=1&query=${query}`;
+      }
+      default:
+        return raw;
+    }
+  };
+
+  const getDisplayValue = (link: any) => {
+    const raw = (link.url || "").trim();
+
+    switch (link.type) {
+      case "PHONE":
+        return raw.replace(/^tel:/i, "");
+      case "EMAIL":
+        return raw.replace(/^mailto:/i, "");
+      case "WEBSITE":
+        return raw.replace(/^https?:\/\//i, "");
+      default:
+        return raw;
     }
   };
 
@@ -65,9 +111,9 @@ export default function IndividualProfile() {
         {categoryLinks.map((link: any) => (
           <a 
             key={link.id} 
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={buildHref(link)}
+            target={["WEBSITE", "LOCATION", "SOCIAL"].includes(link.type) ? "_blank" : undefined}
+            rel={["WEBSITE", "LOCATION", "SOCIAL"].includes(link.type) ? "noopener noreferrer" : undefined}
             className="flex items-center p-3 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 transition-colors group shadow-sm"
           >
             <div className="bg-slate-100 p-2 rounded-full mr-3 text-slate-600 group-hover:text-primary group-hover:bg-primary/10 transition-colors">
@@ -75,7 +121,7 @@ export default function IndividualProfile() {
             </div>
             <div className="flex-1 min-w-0">
                {link.title && <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{link.title}</p>}
-               <p className="font-medium text-slate-900 truncate">{link.url.replace(/^mailto:|tel:/, '')}</p>
+               <p className="font-medium text-slate-900 truncate">{getDisplayValue(link)}</p>
             </div>
           </a>
         ))}

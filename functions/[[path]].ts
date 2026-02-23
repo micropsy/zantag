@@ -8,28 +8,40 @@ export const onRequest = async (context) => {
   // This happens because Wrangler might set Host header differently than the Origin in some proxy setups
   // We'll normalize the Host header to match the Origin if we're in dev mode
   
-  if (context.env.NODE_ENV !== "production") {
-    const request = context.request;
-    const origin = request.headers.get("Origin");
+  const url = new URL(context.request.url);
+  const request = context.request;
+  const origin = request.headers.get("Origin");
+  const host = request.headers.get("Host");
+  
+  console.log(`[Debug] Request: ${request.method} ${url.pathname}`);
+  console.log(`[Debug] Host: ${host}, Origin: ${origin}, Hostname: ${url.hostname}`);
+
+  // Handle Vite client requests to prevent errors
+  if (url.pathname.startsWith("/@vite/client")) {
+    return new Response(null, { status: 404 });
+  }
+
+  // Force Host header fix for all non-GET requests or when Origin is present
+  if (origin && (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]")) {
+    const originUrl = new URL(origin);
     
-    if (origin) {
-      const url = new URL(request.url);
-      const originUrl = new URL(origin);
-      
-      // If we are on localhost, let's try to be lenient
-      if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-         // Clone the request to modify headers
-         const newHeaders = new Headers(request.headers);
-         // Set Host to match the URL host, which should match Origin host in local dev
-         newHeaders.set("Host", url.host); 
-         
-         const newRequest = new Request(request, {
-           headers: newHeaders
-         });
-         
-         // Replace the request in context
-         context.request = newRequest;
-      }
+    if (host !== originUrl.host) {
+        console.log(`[Dev Fix] Host mismatch detected. Fixing Host header from ${host} to ${originUrl.host}`);
+        
+        const newHeaders = new Headers(request.headers);
+        newHeaders.set("Host", originUrl.host);
+        newHeaders.set("X-Forwarded-Host", originUrl.host);
+        
+        const newRequest = new Request(request, {
+            headers: newHeaders,
+            // Preserve other properties
+            method: request.method,
+            redirect: request.redirect,
+            // Pass body only if not GET/HEAD to avoid errors
+            body: (request.method !== 'GET' && request.method !== 'HEAD') ? request.body : null,
+        });
+        
+        context.request = newRequest;
     }
   }
 

@@ -241,6 +241,9 @@ export default function DashboardProfile() {
   const [activeTab, setActiveTab] = useState<"OFFICE" | "PERSONAL">("OFFICE");
   const [previewTab, setPreviewTab] = useState<"OFFICE" | "PERSONAL">("OFFICE");
 
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+
   // Username Validation Logic
   const usernameFetcher = useFetcher<{ available: boolean; message: string }>();
   const lastCheckedUsernameRef = useRef<string | null>(null);
@@ -404,7 +407,24 @@ export default function DashboardProfile() {
            
            {/* Visual Identity (Banner & Avatar) */}
            <Card className="overflow-hidden">
-              <div className="relative h-40 bg-muted group/banner">
+              <div
+                className="relative h-40 bg-muted group/banner cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (bannerInputRef.current) {
+                    bannerInputRef.current.click();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (bannerInputRef.current) {
+                      bannerInputRef.current.click();
+                    }
+                  }
+                }}
+              >
                 {bannerPreview ? (
                   <>
                     <img src={bannerPreview} alt="Banner" className="w-full h-full object-cover" />
@@ -413,11 +433,12 @@ export default function DashboardProfile() {
                       variant="destructive"
                       size="icon"
                       className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover/banner:opacity-100 transition-opacity z-10 h-8 w-8"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setBannerPreview(null);
-                        // We also need to clear the file input if any
-                        const input = document.getElementById('banner-upload') as HTMLInputElement;
-                        if (input) input.value = '';
+                        if (bannerInputRef.current) {
+                          bannerInputRef.current.value = "";
+                        }
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -426,7 +447,7 @@ export default function DashboardProfile() {
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-slate-100">
                     <ImageIcon className="h-8 w-8 opacity-20 mb-2" />
-                    <span className="text-xs opacity-50">Recommended: 600 x 200 px</span>
+                    <span className="text-xs opacity-60">Click to add banner image</span>
                   </div>
                 )}
                 
@@ -435,20 +456,41 @@ export default function DashboardProfile() {
                     <Label htmlFor="banner-upload" className="cursor-pointer bg-black/50 hover:bg-black/70 text-white p-2 rounded-md transition-colors flex items-center gap-2 text-xs">
                       <ImageIcon className="h-4 w-4" /> Add Banner
                     </Label>
-                    <Input 
-                      id="banner-upload" 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={(e) => handleFileChange(e, "banner")} 
-                    />
                   </div>
                 )}
+                <Input 
+                  ref={bannerInputRef}
+                  id="banner-upload" 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => handleFileChange(e, "banner")} 
+                />
+                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full">
+                  Recommended: 600 x 200 px
+                </div>
               </div>
               
               <div className="px-6 pb-6 relative">
                 <div className="relative -top-12 mb-[-30px] flex items-end">
-                   <div className="relative flex flex-col items-center">
+                   <div
+                     className="relative flex flex-col items-center cursor-pointer"
+                     role="button"
+                     tabIndex={0}
+                     onClick={() => {
+                       if (avatarInputRef.current) {
+                         avatarInputRef.current.click();
+                       }
+                     }}
+                     onKeyDown={(e) => {
+                       if (e.key === "Enter" || e.key === " ") {
+                         e.preventDefault();
+                         if (avatarInputRef.current) {
+                           avatarInputRef.current.click();
+                         }
+                       }
+                     }}
+                   >
                      <div className="relative">
                        <Avatar className="w-24 h-24 border-4 border-white bg-white shadow-sm">
                          <AvatarImage src={avatarPreview || ""} />
@@ -458,6 +500,7 @@ export default function DashboardProfile() {
                           <ImageIcon className="h-3 w-3" />
                        </Label>
                        <Input 
+                          ref={avatarInputRef}
                           id="avatar-upload" 
                           type="file" 
                           accept="image/*" 
