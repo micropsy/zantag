@@ -64,14 +64,19 @@ export function SystemConfig({ user }: { user: { role: string } }) {
         {isLoading ? (
           <div className="text-sm text-slate-500">Loading settings...</div>
         ) : isAdmin ? (
-          <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div className="space-y-0.5">
-              <Label className="text-base">Invitation-Only Mode</Label>
+              <Label className="text-base font-medium text-slate-900">Invitation-Only Mode</Label>
               <p className="text-sm text-slate-500">
                 When enabled, new users must have a valid invite code to register.
               </p>
             </div>
-            <Switch checked={invitationOnly} onCheckedChange={handleToggle} />
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700">
+                {invitationOnly ? "Enabled" : "Disabled"}
+              </span>
+              <Switch checked={invitationOnly} onCheckedChange={handleToggle} className="data-[state=unchecked]:bg-slate-300" />
+            </div>
           </div>
         ) : (
           <p className="text-slate-600 text-sm">

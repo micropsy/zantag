@@ -1,8 +1,9 @@
 import { json, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/cloudflare";
+import { redirect } from "@remix-run/cloudflare";
 import { useFetcher, Form } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { getDb } from "~/utils/db.server";
-import { requireUserId } from "~/utils/session.server";
+import { requireUserId, sessionStorage } from "~/utils/session.server";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -11,6 +12,9 @@ import { toast } from "sonner";
 import { Lock, LogOut } from "lucide-react";
 import { compare, hash } from "bcrypt-ts";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
+
+import { deleteUserFolder } from "~/services/storage.server";
+import { getSession } from "~/utils/session.server";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   await requireUserId(request, context);
@@ -24,6 +28,58 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
   console.log(`Settings action intent: ${intent}`);
+
+  if (intent === "delete-account") {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, shortCode: true }
+    });
+
+    if (!user) {
+      return json({ error: "User not found" }, { status: 404 });
+    }
+
+    // R2 Deletion Logic
+    // Only delete R2 folder if user is INDIVIDUAL
+    if (user.role === "INDIVIDUAL" && user.shortCode) {
+      try {
+        await deleteUserFolder(context, user.shortCode);
+        console.log(`Deleted R2 folder for user ${user.shortCode}`);
+      } catch (error) {
+        console.error("Failed to delete R2 folder:", error);
+        // We continue to delete the account even if R2 deletion fails?
+        // User said "R2 ... delete". If it fails, maybe we should log it but proceed?
+        // Or fail? Let's proceed but log.
+      }
+    } else {
+      console.log(`Skipping R2 deletion for user ${user.id} with role ${user.role}`);
+    }
+
+    // Clean up non-cascading relations
+    // InviteCode does not have onDelete: Cascade in schema
+    try {
+      await db.inviteCode.deleteMany({
+        where: { userId: userId }
+      });
+      console.log("Deleted associated invite codes");
+    } catch (error) {
+      console.error("Failed to delete invite codes:", error);
+    }
+
+    // D1 Deletion Logic
+    // This will cascade delete Profile, Links, etc.
+    await db.user.delete({
+      where: { id: userId }
+    });
+
+    // Logout
+    const session = await getSession(request, context);
+    return redirect("/", {
+      headers: {
+        "Set-Cookie": await sessionStorage.destroySession(session),
+      },
+    });
+  }
 
   if (intent === "change-password") {
     const currentPassword = formData.get("currentPassword") as string;
@@ -167,18 +223,29 @@ export default function DashboardSettings() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-destructive/50">
           <CardHeader>
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
-            <CardDescription>
-              Irreversible actions for your account.
+            <CardTitle className="text-destructive flex items-center gap-2">
+              <LogOut className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription className="text-destructive/80">
+              Once you delete your account, there is no going back. Please be certain.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form action="/logout" method="post">
-              <Button variant="destructive">
+            <Form method="post" onSubmit={(e) => {
+              if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+                e.preventDefault();
+              }
+            }}>
+              <input type="hidden" name="intent" value="delete-account" />
+              <Button 
+                variant="destructive" 
+                type="submit"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
-                Sign Out
+                Delete Account
               </Button>
             </Form>
           </CardContent>
