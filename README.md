@@ -8,6 +8,7 @@ ZanTag is a modern digital business card platform that allows professionals to s
 - **Lead Manager**: Capture and organize leads efficiently.
 - **Document Library**: Host and share professional documents.
 - **Easy Sharing**: Dynamic URLs and QR codes for seamless networking.
+- **Card & Invite Management**: Generate and manage NFC card profile IDs (`profileId`) with activation control.
 
 ## Prerequisites
 
@@ -27,17 +28,18 @@ To run the project locally, you need to set up the Cloudflare D1 database and R2
 
 ### 1. Database Setup (D1)
 
-Create the D1 database locally and apply migrations:
+Create the D1 database locally and apply the schema:
 
 ```bash
 # Create the database (if not already created)
 npx wrangler d1 create zantag-db
 
-# Apply migrations locally
-npx wrangler d1 execute zantag-db --local --file=./migrations/0001_init.sql
-npx wrangler d1 execute zantag-db --local --file=./migrations/0002_update_invite_code.sql
-npx wrangler d1 execute zantag-db --local --file=./migrations/0003_add_system_setting.sql
+# Apply the full schema to your local D1 database
+npx wrangler d1 execute zantag-db --local --file=./migrations/0001_schema_full.sql
 ```
+
+This SQL file is idempotent – you can run it multiple times without errors.  
+It aligns the D1 schema with `prisma/schema.prisma` (including `profileId`, `isActivated`, and all related models).
 
 ### 2. Storage Setup (R2)
 
@@ -51,9 +53,10 @@ npx wrangler r2 bucket create zantag-assets
 
 For local development secrets, create a `.dev.vars` file in the root directory:
 
-```
+```bash
 # Example .dev.vars
 SESSION_SECRET="your-super-secret-session-key"
+APP_URL="http://localhost:8788"
 ```
 
 ### 4. Start Development Server
@@ -79,4 +82,9 @@ npm run build
 
 ## Deployment
 
-The project is configured for Cloudflare Pages. Push to the main branch to trigger deployment.
+The project is configured for Cloudflare Pages using the existing `zantag` project:
+
+- Project name in `wrangler.toml`: `zantag`
+- Production deploys: push to the `main` branch on GitHub
+
+Cloudflare Pages will pick up the changes and deploy to the existing production environment (no `v2` / `v3` projects are created).
