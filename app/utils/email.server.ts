@@ -98,49 +98,64 @@ export const sendEmail = async (context: AppLoadContext, options: EmailOptions) 
   const { RESEND_API_KEY } = env;
 
   // Prioritize Gmail if Resend API Key is missing or user explicitly prefers Gmail (implied by absence of Resend key for now)
-  // If RESEND_API_KEY exists, we can try to use it, or we can just stick to Gmail as requested.
-  // The user said "Resend ကို Optional အဖြစ်သတ်မှတ်ထားတာဖြစ်ပါတယ်" (Resend is optional).
-  // And "Gmail API ဖြင့်ချိတ်ဆက်အသုံးပြုရန်" (Connect using Gmail API).
-  
-  // Strategy: Try Gmail first if configured. If not, try Resend. Or vice versa?
-  // User said "Resend when domain is bought", implying Gmail is CURRENT preference.
-  
-  // Let's check for Gmail config first.
-  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REFRESH_TOKEN) {
-    try {
-      return await sendViaGmail(env, options);
-    } catch (error) {
-      console.error("Gmail API failed, falling back/checking Resend...", error);
-      // Fall through to Resend check
-    }
+  if (!RESEND_API_KEY) {
+     try {
+       return await sendViaGmail(env, options);
+     } catch (error) {
+       console.error("Gmail sending failed:", error);
+       throw error;
+     }
   }
 
-  if (RESEND_API_KEY) {
-    const resend = new Resend(RESEND_API_KEY);
-    try {
-      const { data, error } = await resend.emails.send({
-        from: env.EMAIL_FROM || "ZanTag <onboarding@resend.dev>",
-        to: [options.to],
-        subject: options.subject,
-        text: options.text,
-        html: options.html,
-      });
+  const resend = new Resend(RESEND_API_KEY);
 
-      if (error) {
-        throw new Error(error.message);
-      }
-      return data;
-    } catch (error) {
-      console.error("Resend API failed:", error);
-      throw error;
-    }
+  const { data, error } = await resend.emails.send({
+    from: env.EMAIL_FROM || "ZanTag <onboarding@resend.dev>",
+    to: [options.to],
+    subject: options.subject,
+    html: options.html,
+    text: options.text,
+  });
+
+  if (error) {
+    console.error("Resend API Error:", error);
+    // Fallback to Gmail if Resend fails? Optional, but let's stick to one provider per config for now to avoid confusion.
+    throw new Error(`Resend API Error: ${error.message}`);
   }
 
-  // If neither is configured
-  console.log("---------------------------------------------------");
-  console.log("Email Service Disabled (No Config)");
-  console.log(`To: ${options.to}`);
-  console.log(`Subject: ${options.subject}`);
-  console.log("---------------------------------------------------");
-  return { id: "mock-id" };
+  return data;
+};
+
+export const sendPasswordResetEmail = async (
+  context: AppLoadContext,
+  email: string,
+  token: string
+) => {
+  const env = context.cloudflare.env;
+  const appUrl = env.APP_URL || "https://zantag.com"; 
+  // Using query param for simplicity in URL handling if route is flat, but path param is cleaner.
+  // I will assume app/routes/reset-password.$token.tsx
+  const resetLink = `${appUrl}/reset-password/${token}`;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Reset Your Password</h2>
+      <p>You have requested to reset your password for your ZanTag account.</p>
+      <p>Please click the button below to set a new password:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetLink}" style="background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reset Password</a>
+      </div>
+      <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+      <p><a href="${resetLink}">${resetLink}</a></p>
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">If you didn't request this, you can safely ignore this email. Your password will not change.</p>
+      <p style="color: #666; font-size: 14px;">This link will expire in 1 hour.</p>
+    </div>
+  `;
+
+  return sendEmail(context, {
+    to: email,
+    subject: "Reset your ZanTag password",
+    text: `Reset your password here: ${resetLink}`,
+    html,
+  });
 };

@@ -16,6 +16,8 @@ model User {
   inviteCode        InviteCode?
   isEmailVerified   Boolean     @default(false)
   verificationToken String?
+  resetToken        String?
+  resetTokenExpiresAt DateTime?
   role              String      @default("INDIVIDUAL") // INDIVIDUAL, SUPER_ADMIN, BUSINESS_ADMIN, BUSINESS_STAFF
   
   // NEW FIELDS

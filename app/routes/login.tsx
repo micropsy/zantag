@@ -1,5 +1,5 @@
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/cloudflare";
-import { Form, useActionData, useNavigation, Link } from "@remix-run/react";
+import { Form, useActionData, useNavigation, Link, useSearchParams } from "@remix-run/react";
 import { Loader2 } from "lucide-react";
 import { getDb } from "~/utils/db.server";
 import { createUserSession, getUserId } from "~/utils/session.server";
@@ -47,12 +47,17 @@ export default function Login() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [searchParams] = useSearchParams();
+  const resetSuccess = searchParams.get("reset") === "success";
 
   useEffect(() => {
+    if (resetSuccess) {
+      toast.success("Password reset successfully. Please login with your new password.");
+    }
     if (actionData?.error) {
       toast.error(actionData.error);
     }
-  }, [actionData]);
+  }, [actionData, resetSuccess]);
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
