@@ -30,6 +30,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const email = formData.get("email");
   const password = formData.get("password");
   const inviteCode = formData.get("inviteCode");
+  const profileIdRaw = formData.get("profileId");
 
   const isInvitationOnly = await isInvitationOnlyMode(context);
 
@@ -86,7 +87,6 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       inviteOrgSlug = validCode.organizationSlug || undefined;
     }
 
-    // 2. Check if email already exists
     const existingUser = await db.user.findUnique({
       where: { email },
     });
@@ -98,16 +98,55 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       );
     }
 
-    // 3. Create User (Unverified)
+    const profileId =
+      typeof profileIdRaw === "string" && profileIdRaw.trim().length > 0
+        ? profileIdRaw.trim()
+        : undefined;
+
+    const existingProfileUser =
+      profileId
+        ? await db.user.findUnique({
+            where: { profileId },
+          })
+        : null;
+
     const hashedPassword = await hash(password, 10);
     const verificationToken = crypto.randomUUID();
 
-    const newUser = await createUser(context, {
-      email,
-      passwordHash: hashedPassword,
-      inviteCode: (inviteCode as string) || undefined,
-      role: inviteRole
-    });
+    let newUser;
+
+    if (existingProfileUser) {
+      if (existingProfileUser.isActivated) {
+        return json(
+          { error: "This card is already activated. Please login instead." },
+          { status: 400 }
+        );
+      }
+
+      newUser = await db.user.update({
+        where: { id: existingProfileUser.id },
+        data: {
+          email,
+          password: hashedPassword,
+          role: inviteRole,
+          isActivated: true,
+          verificationToken,
+        },
+      });
+    } else {
+      newUser = await createUser(context, {
+        email,
+        passwordHash: hashedPassword,
+        inviteCode: (inviteCode as string) || undefined,
+        role: inviteRole,
+        profileId,
+      });
+
+      await db.user.update({
+        where: { id: newUser.id },
+        data: { verificationToken },
+      });
+    }
     
     // Create Organization if Business Admin
     if (inviteRole === "BUSINESS_ADMIN" && inviteOrgName && inviteOrgSlug) {
@@ -139,12 +178,6 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       });
     }
     
-    // Update verification token (since createUser doesn't set it)
-    await db.user.update({
-      where: { id: newUser.id },
-      data: { verificationToken }
-    });
-
     // 5. Send Verification Email
     const verifyUrl = `${new URL(request.url).origin}/verify?token=${verificationToken}`;
     
@@ -173,6 +206,7 @@ export default function Signup() {
   const isSubmitting = navigation.state === "submitting";
   const [searchParams] = useSearchParams();
   const defaultInviteCode = searchParams.get("invite") || "";
+  const profileId = searchParams.get("profileId") || "";
 
   useEffect(() => {
     if (actionData?.error) {
@@ -199,6 +233,7 @@ export default function Signup() {
           </div>
 
           <Form method="post" className="space-y-6">
+            <input type="hidden" name="profileId" value={profileId} />
             {isInvitationOnly && (
               <div className="space-y-2">
                 <Label htmlFor="inviteCode">Invite Code</Label>

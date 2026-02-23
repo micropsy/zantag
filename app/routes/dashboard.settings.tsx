@@ -22,12 +22,10 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  console.log("Settings action started");
   const userId = await requireUserId(request, context);
   const db = getDb(context);
   const formData = await request.formData();
   const intent = formData.get("intent");
-  console.log(`Settings action intent: ${intent}`);
 
   if (intent === "delete-account") {
     const user = await db.user.findUnique({
@@ -77,23 +75,17 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
               where: { id: org.id },
               data: { adminId: newAdminId }
             });
-            console.log(`Transferred ownership of organization ${org.id} to user ${newAdminId}`);
           }
         }
       }
     }
 
-    // R2 Deletion Logic
-    // Only delete R2 folder if user is INDIVIDUAL
-    if (user.role === "INDIVIDUAL" && user.shortCode) {
+    if (user.role === "INDIVIDUAL" && user.profileId) {
       try {
-        await deleteUserFolder(context, user.shortCode);
-        console.log(`Deleted R2 folder for user ${user.shortCode}`);
+        await deleteUserFolder(context, user.profileId);
       } catch (error) {
         console.error("Failed to delete R2 folder:", error);
       }
-    } else {
-      console.log(`Skipping R2 deletion for user ${user.id} with role ${user.role}`);
     }
 
     // Clean up non-cascading relations
@@ -101,7 +93,6 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       await db.inviteCode.deleteMany({
         where: { userId: userId }
       });
-      console.log("Deleted associated invite codes");
     } catch (error) {
       console.error("Failed to delete invite codes:", error);
     }
@@ -127,17 +118,14 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     const confirmPassword = formData.get("confirmPassword") as string;
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      console.log("Missing password fields");
       return json({ error: "All fields are required" }, { status: 400 });
     }
 
     if (newPassword !== confirmPassword) {
-      console.log("New passwords do not match");
       return json({ error: "New passwords do not match" }, { status: 400 });
     }
 
     if (newPassword.length < 6) {
-      console.log("Password too short");
       return json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
@@ -146,26 +134,21 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     });
 
     if (!user) {
-      console.log("User not found for password change");
       return json({ error: "User not found" }, { status: 404 });
     }
 
-    console.log("Verifying current password...");
     const isValid = await compare(currentPassword, user.password);
-    console.log(`Current password valid: ${isValid}`);
 
     if (!isValid) {
       return json({ error: "Incorrect current password" }, { status: 400 });
     }
 
     const hashedPassword = await hash(newPassword, 10);
-    console.log("Hashing new password and updating DB...");
 
     await db.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
-    console.log("Password updated successfully");
 
     return json({ success: true });
   }

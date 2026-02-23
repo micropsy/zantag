@@ -43,7 +43,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     where: { userId },
     select: { 
       id: true,
-      user: { select: { shortCode: true } }
+      user: { select: { profileId: true } }
     }
   });
 
@@ -68,8 +68,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffer = await new Blob(chunks as any).arrayBuffer();
     
-    // Use shortCode for folder if available, fallback to profile ID
-    const folder = profile.user.shortCode || profile.id;
+    const folder = profile.user.profileId || profile.id;
     const key = `${folder}/${Date.now()}-${filename}`;
     
     // Use R2 binding

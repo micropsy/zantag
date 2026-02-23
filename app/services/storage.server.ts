@@ -1,10 +1,10 @@
 import { type AppLoadContext } from "@remix-run/cloudflare";
 
-// Upload asset to R2 using shortCode as folder structure
-// Path: r2-bucket/users/{shortCode}/{filename}
+// Upload asset to R2 using profileId as folder structure
+// Path: r2-bucket/users/{profileId}/{filename}
 export async function uploadAsset(
   context: AppLoadContext, 
-  shortCode: string, 
+  profileId: string, 
   file: File, 
   folder: string = "assets"
 ): Promise<string> {
@@ -13,7 +13,7 @@ export async function uploadAsset(
     throw new Error("BUCKET binding is missing");
   }
 
-  const key = `users/${shortCode}/${folder}/${file.name}`;
+  const key = `users/${profileId}/${folder}/${file.name}`;
   
   await env.BUCKET.put(key, file.stream(), {
     httpMetadata: {
@@ -35,15 +35,13 @@ export async function deleteAsset(context: AppLoadContext, key: string) {
   return env.BUCKET.delete(key);
 }
 
-// Clean up entire user folder (e.g. on hard delete)
-// Note: R2 doesn't support folder deletion, must list and delete objects
-export async function deleteUserFolder(context: AppLoadContext, shortCode: string) {
+export async function deleteUserFolder(context: AppLoadContext, profileId: string) {
     const env = context.cloudflare.env;
     if (!env.BUCKET) {
       throw new Error("BUCKET binding is missing");
     }
 
-    const prefix = `users/${shortCode}/`;
+    const prefix = `users/${profileId}/`;
     let truncated = true;
     let cursor: string | undefined;
 

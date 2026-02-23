@@ -2,33 +2,34 @@ import { type AppLoadContext } from "@remix-run/cloudflare";
 import { getDb } from "~/utils/db.server";
 import { generateRandomCode } from "./utils.server";
 
-// Generate a unique 5-character short code
-export async function generateUniqueShortCode(context: AppLoadContext): Promise<string> {
+export async function generateUniqueProfileId(
+  context: AppLoadContext,
+  length = 5
+): Promise<string> {
   const db = getDb(context);
-  let code = generateRandomCode(5);
+  let id = generateRandomCode(length);
   let isUnique = false;
   let attempts = 0;
 
   while (!isUnique && attempts < 10) {
     const existing = await db.user.findUnique({
-      where: { shortCode: code },
+      where: { profileId: id },
     });
     if (!existing) {
       isUnique = true;
     } else {
-      code = generateRandomCode(5);
+      id = generateRandomCode(length);
       attempts++;
     }
   }
 
   if (!isUnique) {
-    throw new Error("Failed to generate a unique short code after multiple attempts.");
+    throw new Error("Failed to generate a unique profile ID after multiple attempts.");
   }
 
-  return code;
+  return id;
 }
 
-// Create a new user with automatic shortCode
 export async function createUser(
   context: AppLoadContext,
   data: {
@@ -37,10 +38,11 @@ export async function createUser(
     name?: string;
     role?: string;
     inviteCode?: string;
+    profileId?: string;
   }
 ) {
   const db = getDb(context);
-  const shortCode = await generateUniqueShortCode(context);
+  const profileId = data.profileId ?? (await generateUniqueProfileId(context));
 
   return db.user.create({
     data: {
@@ -48,7 +50,8 @@ export async function createUser(
       password: data.passwordHash,
       name: data.name,
       role: data.role || "INDIVIDUAL",
-      shortCode,
+      profileId,
+      isActivated: true,
       status: "ACTIVE",
       inviteCode: data.inviteCode ? { connect: { code: data.inviteCode } } : undefined,
     },
@@ -73,11 +76,13 @@ export async function getProfileByUsername(context: AppLoadContext, username: st
 // Reserved words that cannot be used as usernames
 export const RESERVED_USERNAMES = [
   "login",
+  "register",
   "signup",
   "dashboard",
   "admin",
   "api",
   "settings",
+  "user",
   "profile",
   "logout",
   "verify",

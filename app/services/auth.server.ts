@@ -44,7 +44,7 @@ export async function getUser(request: Request, context: AppLoadContext) {
   const db = getDb(context);
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, role: true, shortCode: true, status: true },
+    select: { id: true, email: true, name: true, role: true, profileId: true, status: true },
   });
 
   return user;

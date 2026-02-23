@@ -1,40 +1,168 @@
 import { type ActionFunctionArgs, json } from "@remix-run/cloudflare";
+import { hash } from "bcrypt-ts";
 import { getDb } from "~/utils/db.server";
 import { requireAdmin } from "~/utils/session.server";
 import { removeStaff } from "~/services/business.server";
 import { deleteUserFolder } from "~/services/storage.server";
+import { generateUniqueProfileId } from "~/services/user.server";
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
   const currentUser = await requireAdmin(request, context);
   const db = getDb(context);
 
+  if (request.method === "GET") {
+    const url = new URL(request.url);
+    const intent = url.searchParams.get("intent");
+
+    if (intent === "card-list") {
+      if (currentUser.role !== "SUPER_ADMIN") {
+        return json({ error: "Not authorized" }, { status: 403 });
+      }
+
+      const cards = await db.user.findMany({
+        where: {
+          isActivated: false,
+          profileId: { not: null },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          profileId: true,
+          createdAt: true,
+        },
+      });
+
+      return json(cards);
+    }
+
+    return json({ error: "Invalid intent" }, { status: 400 });
+  }
+
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
   }
 
-  const data = await request.json() as { 
-    id: string; 
-    intent?: "update" | "reset-password" | "delete" | "separate";
-    // Update fields
-    name?: string; 
-    email?: string; 
+  const data = (await request.json()) as {
+    id?: string;
+    intent?:
+      | "update"
+      | "reset-password"
+      | "delete"
+      | "separate"
+      | "card-single"
+      | "card-bulk";
+    name?: string;
+    email?: string;
     role?: string;
+    profileId?: string;
+    amount?: number;
   };
-
-  if (!data.id) {
-    return json({ error: "User ID is required" }, { status: 400 });
-  }
-
-  // Prevent self-role modification
-  if (data.id === currentUser.id && data.role && data.role !== currentUser.role) {
-    return json({ error: "You cannot change your own role." }, { status: 403 });
-  }
 
   const intent = data.intent || "update";
 
+  if (
+    (intent === "update" ||
+      intent === "reset-password" ||
+      intent === "delete" ||
+      intent === "separate") &&
+    !data.id
+  ) {
+    return json({ error: "User ID is required" }, { status: 400 });
+  }
+
+  if (
+    data.id &&
+    intent === "update" &&
+    data.id === currentUser.id &&
+    data.role &&
+    data.role !== currentUser.role
+  ) {
+    return json({ error: "You cannot change your own role." }, { status: 403 });
+  }
+
   try {
-    if (intent === "separate") {
-      // Start 30-day grace period
+    if (intent === "card-single") {
+      if (currentUser.role !== "SUPER_ADMIN") {
+        return json({ error: "Not authorized" }, { status: 403 });
+      }
+
+      const rawProfileId = data.profileId;
+      if (!rawProfileId || typeof rawProfileId !== "string" || !rawProfileId.trim()) {
+        return json({ error: "profileId is required" }, { status: 400 });
+      }
+
+      const profileId = rawProfileId.trim();
+
+      const existing = await db.user.findUnique({
+        where: { profileId },
+      });
+
+      if (existing) {
+        return json({ error: "profileId already exists" }, { status: 400 });
+      }
+
+      const placeholderEmail = `card+${profileId}@cards.local`;
+      const placeholderPasswordHash = await hash(
+        `${profileId}-${Date.now().toString()}`,
+        10
+      );
+
+      await db.user.create({
+        data: {
+          email: placeholderEmail,
+          password: placeholderPasswordHash,
+          role: "INDIVIDUAL",
+          profileId,
+          isActivated: false,
+          status: "ACTIVE",
+        },
+      });
+
+      return json({ success: true });
+    }
+
+    if (intent === "card-bulk") {
+      if (currentUser.role !== "SUPER_ADMIN") {
+        return json({ error: "Not authorized" }, { status: 403 });
+      }
+
+      const rawAmount =
+        typeof data.amount === "number"
+          ? data.amount
+          : parseInt(String(data.amount ?? ""), 10);
+
+      if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+        return json({ error: "Amount must be a positive number" }, { status: 400 });
+      }
+
+      const amount = Math.min(rawAmount, 500);
+      const created: string[] = [];
+
+      for (let i = 0; i < amount; i++) {
+        const profileId = await generateUniqueProfileId(context, 8);
+        const placeholderEmail = `card+${profileId}@cards.local`;
+        const placeholderPasswordHash = await hash(
+          `${profileId}-${Date.now().toString()}-${i}`,
+          10
+        );
+
+        await db.user.create({
+          data: {
+            email: placeholderEmail,
+            password: placeholderPasswordHash,
+            role: "INDIVIDUAL",
+            profileId,
+            isActivated: false,
+            status: "ACTIVE",
+          },
+        });
+
+        created.push(profileId);
+      }
+
+      return json({ success: true, created });
+    }
+
+    if (intent === "separate" && data.id) {
       await removeStaff(context, currentUser.id, data.id);
       return json({ success: true, message: "User separated. 30-day grace period started." });
     }
@@ -80,9 +208,9 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 
       // Individual Deletion (D1 + R2)
       if (user.role === "INDIVIDUAL") {
-         if (user.shortCode) {
+         if (user.profileId) {
             try {
-              await deleteUserFolder(context, user.shortCode);
+              await deleteUserFolder(context, user.profileId);
             } catch (e) {
               console.error("R2 deletion failed", e);
             }

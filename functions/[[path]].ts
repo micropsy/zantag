@@ -12,9 +12,6 @@ export const onRequest = async (context) => {
   const request = context.request;
   const origin = request.headers.get("Origin");
   const host = request.headers.get("Host");
-  
-  console.log(`[Debug] Request: ${request.method} ${url.pathname}`);
-  console.log(`[Debug] Host: ${host}, Origin: ${origin}, Hostname: ${url.hostname}`);
 
   // Handle Vite client requests to prevent errors
   if (url.pathname.startsWith("/@vite/client")) {
@@ -26,8 +23,6 @@ export const onRequest = async (context) => {
     const originUrl = new URL(origin);
     
     if (host !== originUrl.host) {
-        console.log(`[Dev Fix] Host mismatch detected. Fixing Host header from ${host} to ${originUrl.host}`);
-        
         const newHeaders = new Headers(request.headers);
         newHeaders.set("Host", originUrl.host);
         newHeaders.set("X-Forwarded-Host", originUrl.host);

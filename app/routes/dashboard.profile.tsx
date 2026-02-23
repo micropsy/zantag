@@ -25,7 +25,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     where: { userId },
     include: {
       links: true,
-      user: { select: { role: true, shortCode: true, name: true } },
+      user: { select: { role: true, profileId: true, name: true } },
       company: { select: { slug: true } },
     },
   });
@@ -48,7 +48,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   // Verify profile ownership
   const existingProfile = await db.profile.findUnique({
     where: { userId },
-    include: { user: { select: { shortCode: true } } },
+    include: { user: { select: { profileId: true } } },
   });
 
   if (!existingProfile) {
@@ -68,10 +68,8 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     }
     const buffer = await new Blob(chunks as any).arrayBuffer();
     
-    // Generate key using shortCode: {shortCode}/profile_{shortCode}.png or {shortCode}/banner_{shortCode}.png
-    // We enforce .png extension as requested
-    const shortCode = existingProfile.user.shortCode;
-    const key = `${shortCode}/${name === "avatar" ? "profile" : "banner"}_${shortCode}.png`;
+    const profileId = existingProfile.user.profileId;
+    const key = `${profileId}/${name === "avatar" ? "profile" : "banner"}_${profileId}.png`;
     
     if (bucket) {
       await bucket.put(key, buffer, {
@@ -122,8 +120,8 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 
     // Handle Banner Deletion from R2
     if (deleteBanner && bucket) {
-      const shortCode = existingProfile.user.shortCode;
-      const key = `${shortCode}/banner_${shortCode}.png`;
+      const profileId = existingProfile.user.profileId;
+      const key = `${profileId}/banner_${profileId}.png`;
       try {
         await bucket.delete(key);
       } catch (error) {
@@ -699,14 +697,14 @@ export default function DashboardProfile() {
                     <Label className="text-xs font-medium uppercase text-muted-foreground mb-1.5 block">Permanent Link (Always Works)</Label>
                     <div className="flex gap-2">
                       <code className="flex-1 bg-muted p-2 rounded text-xs font-mono break-all border text-emerald-600">
-                        {domainUrl}/c/{profile.user.shortCode}
+                        {domainUrl}/c/{profile.user.profileId}
                       </code>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${domainUrl}/c/${profile.user.shortCode}`);
+                            onClick={() => {
+                          navigator.clipboard.writeText(`${domainUrl}/c/${profile.user.profileId}`);
                           toast.success("Link copied to clipboard");
                         }}
                       >
@@ -718,7 +716,7 @@ export default function DashboardProfile() {
                         size="sm"
                         asChild
                       >
-                        <a href={`/c/${profile.user.shortCode}`} target="_blank" rel="noreferrer">
+                        <a href={`/c/${profile.user.profileId}`} target="_blank" rel="noreferrer">
                           Open
                         </a>
                       </Button>

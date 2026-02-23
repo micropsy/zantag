@@ -18,39 +18,29 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
-  console.log("Login action started");
   try {
     const formData = await request.formData();
     const email = formData.get("email");
     const password = formData.get("password");
 
     if (typeof email !== "string" || typeof password !== "string") {
-      console.log("Invalid form data");
       return json({ error: "Invalid form data" }, { status: 400 });
     }
 
-    console.log(`Attempting login for email: ${email}`);
     const db = getDb(context);
-    console.log("DB connection established");
     
     const user = await db.user.findUnique({ where: { email } });
-    console.log(`User found: ${!!user}`);
 
     if (!user) {
-      console.log("User not found");
       return json({ error: "Account not found. Please sign up first." }, { status: 400 });
     }
 
-    console.log("Verifying password...");
     const isCorrectPassword = await compare(password, user.password);
-    console.log(`Password correct: ${isCorrectPassword}`);
     
     if (!isCorrectPassword) {
-      console.log("Incorrect password");
       return json({ error: "Incorrect password. Please try again." }, { status: 400 });
     }
 
-    console.log("Creating session...");
     return createUserSession(user.id, "/dashboard", context);
   } catch (error) {
     console.error("Login error:", error);

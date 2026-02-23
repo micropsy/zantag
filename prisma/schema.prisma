@@ -21,7 +21,9 @@ model User {
   role              String      @default("INDIVIDUAL") // INDIVIDUAL, SUPER_ADMIN, BUSINESS_ADMIN, BUSINESS_STAFF
   
   // NEW FIELDS
-  shortCode         String?     @unique // 5-char code (e.g., 11julq)
+  profileId         String?     @unique
+  isActivated       Boolean     @default(false)
+  secretKey         String?
   status            String      @default("ACTIVE") // ACTIVE, INACTIVE, GRACE_PERIOD
   separatedAt       DateTime?   // Timestamp when staff was removed (start of 30-day grace)
 

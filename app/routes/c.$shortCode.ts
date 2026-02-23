@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs, redirect } from "@remix-run/cloudflare";
-import { resolveShortCode } from "~/services/redirect.server";
+import { resolveProfileId } from "~/services/redirect.server";
+import { getDomainUrl } from "~/utils/helpers";
 
 export const loader = async ({ request, params, context }: LoaderFunctionArgs) => {
   const { shortCode } = params;
@@ -9,15 +10,23 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
   }
 
   try {
-    const destination = await resolveShortCode(context, request, shortCode);
-    
-    if (!destination) {
-      // Short code not found
-      // Could redirect to a 404 page or home with error
+    const result = await resolveProfileId(context, request, shortCode);
+
+    if (result.type === "NOT_FOUND") {
       return redirect("/?error=invalid_code");
     }
 
-    return redirect(destination);
+    if (result.type === "ACTIVATE") {
+      const domainUrl = getDomainUrl(request, context);
+      const activationUrl = `${domainUrl}/register?profileId=${encodeURIComponent(result.profileId)}`;
+      return redirect(activationUrl);
+    }
+
+    if (result.type === "REDIRECT") {
+      return redirect(result.url);
+    }
+
+    return redirect("/?error=redirect_failed");
   } catch (error) {
     console.error("Redirect error:", error);
     return redirect("/?error=redirect_failed");
