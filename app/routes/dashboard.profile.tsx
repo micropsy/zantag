@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, unstable_parseMultipartFormData, type UploadHandler, unstable_composeUploadHandlers, unstable_createMemoryUploadHandler } from "@remix-run/cloudflare";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { getDomainUrl } from "~/utils/helpers";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Trash2, Link as LinkIcon, Save, Check, X, Loader2, Phone, Mail, Globe, MapPin, Building, User, Image as ImageIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { ImageCropper } from "~/components/image-cropper";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request, context);
@@ -47,6 +48,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   // Verify profile ownership
   const existingProfile = await db.profile.findUnique({
     where: { userId },
+    include: { user: { select: { shortCode: true } } },
   });
 
   if (!existingProfile) {
@@ -54,6 +56,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   }
 
   // Custom Upload Handler for R2
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const uploadHandler: UploadHandler = async ({ name, filename, data, contentType }) => {
     if ((name !== "avatar" && name !== "banner") || !filename) {
       return undefined;
@@ -65,16 +68,21 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     }
     const buffer = await new Blob(chunks as any).arrayBuffer();
     
-    // Generate unique key
-    const ext = filename.split('.').pop();
-    const key = `${existingProfile.id}/${name}-${Date.now()}.${ext}`;
+    // Generate key using shortCode: {shortCode}/profile_{shortCode}.png or {shortCode}/banner_{shortCode}.png
+    // We enforce .png extension as requested
+    const shortCode = existingProfile.user.shortCode;
+    const key = `${shortCode}/${name === "avatar" ? "profile" : "banner"}_${shortCode}.png`;
     
     if (bucket) {
       await bucket.put(key, buffer, {
-        httpMetadata: { contentType }
+        httpMetadata: { contentType: "image/png" } // Enforce PNG content type since we save as .png
       });
-      // Return the full public URL if configured, otherwise the key
-      return r2PublicUrl ? `${r2PublicUrl}/${key}` : key;
+      // Return the full public URL if configured, otherwise use the local resource route
+      // Append timestamp for cache busting
+      const baseUrl = r2PublicUrl ? `${r2PublicUrl}/${key}` : `/images/${key}`;
+      return `${baseUrl}?v=${Date.now()}`;
+    } else {
+      console.error("R2 Bucket binding 'BUCKET' is missing in context.cloudflare.env");
     }
     
     return undefined;
@@ -103,9 +111,25 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     };
 
     // 2. Handle File Uploads
-    const avatarUrl = formData.get("avatar") as string;
-    const bannerUrl = formData.get("banner") as string;
+    const avatarEntry = formData.get("avatar");
+    const bannerEntry = formData.get("banner");
+    
+    // Ensure we only get strings (URLs from upload handler) not File objects
+    const avatarUrl = typeof avatarEntry === "string" ? avatarEntry : undefined;
+    const bannerUrl = typeof bannerEntry === "string" ? bannerEntry : undefined;
+    
     const deleteBanner = formData.get("deleteBanner") === "true";
+
+    // Handle Banner Deletion from R2
+    if (deleteBanner && bucket) {
+      const shortCode = existingProfile.user.shortCode;
+      const key = `${shortCode}/banner_${shortCode}.png`;
+      try {
+        await bucket.delete(key);
+      } catch (error) {
+        console.error("Failed to delete banner from R2", error);
+      }
+    }
 
     // 3. Handle Contact Links (JSON)
     const linksDataRaw = formData.get("linksData") as string;
@@ -142,8 +166,8 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         department: rawData.department as string || null,
         companyName: rawData.companyName as string || null,
         primaryColor: rawData.primaryColor as string || undefined,
-        avatarUrl: avatarUrl || undefined, // Only update if new file uploaded (handler returns string)
-        bannerUrl: deleteBanner ? null : (bannerUrl || undefined),
+        avatarUrl: avatarUrl, // Will be undefined if not string (i.e. not uploaded)
+        bannerUrl: deleteBanner ? null : bannerUrl,
       } as any,
     });
 
@@ -199,10 +223,18 @@ export default function DashboardProfile() {
   const [companyName, setCompanyName] = useState(profile.companyName || "");
   const [bio, setBio] = useState(profile.bio || "");
   const [primaryColor, setPrimaryColor] = useState(profile.primaryColor || "#0F172A");
+  const [secondaryColor, setSecondaryColor] = useState(profile.secondaryColor || "#06B6D4");
   
   // File Previews
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatarUrl);
   const [bannerPreview, setBannerPreview] = useState<string | null>(profile.bannerUrl);
+
+  // Cropping State
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [croppingImage, setCroppingImage] = useState<string | null>(null);
+  const [cropType, setCropType] = useState<"avatar" | "banner">("avatar");
+  const [croppedAvatar, setCroppedAvatar] = useState<Blob | null>(null);
+  const [croppedBanner, setCroppedBanner] = useState<Blob | null>(null);
 
   // Initialize links state from loaded data
   const [links, setLinks] = useState<any[]>(profile.links || []);
@@ -211,6 +243,7 @@ export default function DashboardProfile() {
 
   // Username Validation Logic
   const usernameFetcher = useFetcher<{ available: boolean; message: string }>();
+  const lastCheckedUsernameRef = useRef<string | null>(null);
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -220,7 +253,17 @@ export default function DashboardProfile() {
   }, [username]);
 
   useEffect(() => {
-    if (debouncedUsername && debouncedUsername.length >= 3 && debouncedUsername !== profile.username) {
+    // Only check if:
+    // 1. Username is valid length
+    // 2. Different from current profile username
+    // 3. Different from last checked username (to prevent loops)
+    if (
+      debouncedUsername && 
+      debouncedUsername.length >= 3 && 
+      debouncedUsername !== profile.username &&
+      debouncedUsername !== lastCheckedUsernameRef.current
+    ) {
+      lastCheckedUsernameRef.current = debouncedUsername;
       usernameFetcher.load(`/api/check-username?username=${debouncedUsername}`);
     }
   }, [debouncedUsername, profile.username, usernameFetcher]);
@@ -229,16 +272,50 @@ export default function DashboardProfile() {
     setUsername(e.target.value);
   };
   
-  const isUsernameChecking = username !== debouncedUsername || usernameFetcher.state !== "idle";
+  const isUsernameChecking = usernameFetcher.state !== "idle";
 
   // File Handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "avatar" | "banner") => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      if (type === "avatar") setAvatarPreview(url);
-      else setBannerPreview(url);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCroppingImage(reader.result as string);
+        setCropType(type);
+        setCropModalOpen(true);
+      };
+      reader.readAsDataURL(file);
     }
+    // Clear input value to allow re-selecting same file
+    e.target.value = "";
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    const url = URL.createObjectURL(croppedBlob);
+    if (cropType === "avatar") {
+      setAvatarPreview(url);
+      setCroppedAvatar(croppedBlob);
+    } else {
+      setBannerPreview(url);
+      setCroppedBanner(croppedBlob);
+    }
+    setCropModalOpen(false);
+    setCroppingImage(null);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    // Append cropped files if they exist
+    if (croppedAvatar) {
+      formData.set("avatar", croppedAvatar, "avatar.png");
+    }
+    if (croppedBanner) {
+      formData.set("banner", croppedBanner, "banner.png");
+    }
+
+    fetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
   };
 
   // Link Handlers
@@ -317,6 +394,7 @@ export default function DashboardProfile() {
         <fetcher.Form 
           method="post" 
           id="profile-form" 
+          onSubmit={handleFormSubmit}
           className="lg:col-span-2 space-y-6"
           encType="multipart/form-data"
         >
@@ -334,7 +412,7 @@ export default function DashboardProfile() {
                       type="button"
                       variant="destructive"
                       size="icon"
-                      className="absolute top-2 right-2 opacity-0 group-hover/banner:opacity-100 transition-opacity z-10 h-8 w-8"
+                      className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover/banner:opacity-100 transition-opacity z-10 h-8 w-8"
                       onClick={() => {
                         setBannerPreview(null);
                         // We also need to clear the file input if any
@@ -346,8 +424,9 @@ export default function DashboardProfile() {
                     </Button>
                   </>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-slate-100">
-                    <ImageIcon className="h-8 w-8 opacity-20" />
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground bg-slate-100">
+                    <ImageIcon className="h-8 w-8 opacity-20 mb-2" />
+                    <span className="text-xs opacity-50">Recommended: 600 x 200 px</span>
                   </div>
                 )}
                 
@@ -358,7 +437,6 @@ export default function DashboardProfile() {
                     </Label>
                     <Input 
                       id="banner-upload" 
-                      name="banner" 
                       type="file" 
                       accept="image/*" 
                       className="hidden" 
@@ -370,22 +448,26 @@ export default function DashboardProfile() {
               
               <div className="px-6 pb-6 relative">
                 <div className="relative -top-12 mb-[-30px] flex items-end">
-                   <div className="relative">
-                     <Avatar className="w-24 h-24 border-4 border-white bg-white shadow-sm">
-                       <AvatarImage src={avatarPreview || ""} />
-                       <AvatarFallback className="text-xl">{displayName?.[0] || "U"}</AvatarFallback>
-                     </Avatar>
-                     <Label htmlFor="avatar-upload" className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full cursor-pointer hover:bg-primary/90 border-2 border-white shadow-sm">
-                        <ImageIcon className="h-3 w-3" />
-                     </Label>
-                     <Input 
-                        id="avatar-upload" 
-                        name="avatar" 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={(e) => handleFileChange(e, "avatar")} 
-                      />
+                   <div className="relative flex flex-col items-center">
+                     <div className="relative">
+                       <Avatar className="w-24 h-24 border-4 border-white bg-white shadow-sm">
+                         <AvatarImage src={avatarPreview || ""} />
+                         <AvatarFallback className="text-xl">{displayName?.[0] || "U"}</AvatarFallback>
+                       </Avatar>
+                       <Label htmlFor="avatar-upload" className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full cursor-pointer hover:bg-primary/90 border-2 border-white shadow-sm">
+                          <ImageIcon className="h-3 w-3" />
+                       </Label>
+                       <Input 
+                          id="avatar-upload" 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => handleFileChange(e, "avatar")} 
+                        />
+                     </div>
+                     <p className="text-[10px] text-muted-foreground text-center mt-2 bg-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm border shadow-sm">
+                        Recommended: 400 x 400 px
+                     </p>
                    </div>
                 </div>
               </div>
@@ -525,7 +607,7 @@ export default function DashboardProfile() {
                           type="button" 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                           onClick={() => removeLink(link.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -538,16 +620,18 @@ export default function DashboardProfile() {
               </CardContent>
            </Card>
 
-           {/* Public Profile URL Settings */}
+           {/* Public Profile URL Settings & Theme Colors */}
            <Card>
               <CardHeader>
-                <CardTitle className="text-base">Profile URL & Settings</CardTitle>
+                <CardTitle className="text-base">Profile Settings</CardTitle>
+                <CardDescription>Customize your public profile appearance and URL.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Profile URL */}
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-xs font-medium uppercase text-muted-foreground">Custom URL</Label>
                   <div className="flex rounded-md shadow-sm relative">
-                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm select-none">
                       {domainUrl.replace(/^https?:\/\//, "")}/user/
                     </span>
                     <Input
@@ -558,7 +642,7 @@ export default function DashboardProfile() {
                       className="rounded-l-none"
                     />
                     <div className="absolute right-3 top-2.5">
-                       {isUsernameChecking && <Loader2 className="h-4 w-4 animate-spin" />}
+                       {isUsernameChecking && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                        {!isUsernameChecking && username !== profile.username && isUsernameValid && <Check className="h-4 w-4 text-green-500" />}
                        {!isUsernameChecking && username !== profile.username && isUsernameValid === false && <X className="h-4 w-4 text-red-500" />}
                     </div>
@@ -566,6 +650,96 @@ export default function DashboardProfile() {
                   {usernameMessage && (
                     <p className={`text-sm ${isUsernameValid ? "text-green-600" : "text-red-500"}`}>{usernameMessage}</p>
                   )}
+                  
+                  {/* Permanent Link Display */}
+                  <div className="mt-2 pt-2 border-t">
+                    <Label className="text-xs font-medium uppercase text-muted-foreground mb-1.5 block">Permanent Link (Always Works)</Label>
+                    <div className="flex gap-2">
+                      <code className="flex-1 bg-muted p-2 rounded text-xs font-mono break-all border text-emerald-600">
+                        {domainUrl}/c/{profile.user.shortCode}
+                      </code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${domainUrl}/c/${profile.user.shortCode}`);
+                          toast.success("Link copied to clipboard");
+                        }}
+                      >
+                        Copy
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        asChild
+                      >
+                        <a href={`/c/${profile.user.shortCode}`} target="_blank" rel="noreferrer">
+                          Open
+                        </a>
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                       Use this link for physical NFC cards. It will never change even if you update your Custom URL.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Theme Colors (Moved here) */}
+                <div className="space-y-4 pt-4 border-t">
+                    <Label className="text-xs font-medium uppercase text-muted-foreground">Theme Colors</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Primary Color */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Primary Color</Label>
+                        <div className="flex gap-2">
+                          <div className="relative w-10 h-10 rounded-md overflow-hidden border shadow-sm">
+                            <input
+                              type="color"
+                              name="primaryColor"
+                              form="profile-form"
+                              value={primaryColor}
+                              onChange={(e) => setPrimaryColor(e.target.value)}
+                              className="absolute -top-2 -left-2 w-16 h-16 p-0 border-0 cursor-pointer"
+                            />
+                          </div>
+                          <Input
+                            value={primaryColor}
+                            onChange={(e) => setPrimaryColor(e.target.value)}
+                            className="flex-1 uppercase font-mono"
+                            maxLength={7}
+                            form="profile-form"
+                            name="primaryColor"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Secondary Color */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Secondary Color (Teal)</Label>
+                        <div className="flex gap-2">
+                          <div className="relative w-10 h-10 rounded-md overflow-hidden border shadow-sm">
+                            <input
+                              type="color"
+                              name="secondaryColor"
+                              form="profile-form"
+                              value={secondaryColor}
+                              onChange={(e) => setSecondaryColor(e.target.value)}
+                              className="absolute -top-2 -left-2 w-16 h-16 p-0 border-0 cursor-pointer"
+                            />
+                          </div>
+                          <Input
+                            value={secondaryColor}
+                            onChange={(e) => setSecondaryColor(e.target.value)}
+                            className="flex-1 uppercase font-mono"
+                            maxLength={7}
+                            form="profile-form"
+                            name="secondaryColor"
+                          />
+                        </div>
+                      </div>
+                    </div>
                 </div>
               </CardContent>
            </Card>
@@ -584,7 +758,7 @@ export default function DashboardProfile() {
                       {/* Mobile Preview Content */}
                       <div className="flex-1 overflow-y-auto scrollbar-hide bg-slate-50">
                         {/* Banner */}
-                        <div className="h-28 bg-slate-900 relative shrink-0">
+                        <div className="h-28 bg-slate-900 relative shrink-0" style={{ backgroundColor: !bannerPreview ? primaryColor : undefined }}>
                           {bannerPreview && <img src={bannerPreview} alt="Mobile Banner" className="w-full h-full object-cover" />}
                         </div>
                         
@@ -597,26 +771,31 @@ export default function DashboardProfile() {
                              </Avatar>
                           </div>
                           
-                          <div className="space-y-0.5 mb-4">
-                             <h3 className="font-bold text-lg leading-tight text-slate-900">{displayName || "Your Name"}</h3>
+                          <div className="space-y-1 mb-4">
+                             <h3 className="font-bold text-lg leading-tight text-slate-900 line-clamp-2">{displayName || "Your Name"}</h3>
+                             
                              {(position || department) && (
-                               <p className="text-xs font-medium text-slate-600">
-                                 {[position, department].filter(Boolean).join(" • ")}
-                               </p>
+                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium text-slate-600">
+                                 {position && <span>{position}</span>}
+                                 {position && department && <span className="text-slate-300">•</span>}
+                                 {department && <span>{department}</span>}
+                               </div>
                              )}
+                             
                              {companyName && (
-                               <p className="text-xs text-slate-500 flex items-center gap-1">
-                                 <Building className="h-3 w-3" /> {companyName}
+                               <p className="text-xs text-slate-500 flex items-start gap-1.5 pt-0.5">
+                                 <Building className="h-3 w-3 mt-0.5 shrink-0" style={{ color: secondaryColor }} /> 
+                                 <span className="line-clamp-2 leading-snug">{companyName}</span>
                                </p>
                              )}
                           </div>
 
                           {/* Action Buttons Mock */}
                           <div className="grid grid-cols-2 gap-2 mb-4">
-                             <div className="bg-slate-900 h-8 rounded-md flex items-center justify-center text-white text-xs font-medium shadow-sm">
+                             <div className="bg-slate-900 h-8 rounded-md flex items-center justify-center text-white text-xs font-medium shadow-sm" style={{ backgroundColor: primaryColor }}>
                                Save Contact
                              </div>
-                             <div className="bg-white border h-8 rounded-md flex items-center justify-center text-slate-700 text-xs font-medium shadow-sm">
+                             <div className="bg-white border h-8 rounded-md flex items-center justify-center text-slate-700 text-xs font-medium shadow-sm" style={{ color: secondaryColor, borderColor: secondaryColor }}>
                                Connect
                              </div>
                           </div>
@@ -634,14 +813,16 @@ export default function DashboardProfile() {
                                 <button 
                                   type="button"
                                   onClick={() => setPreviewTab("OFFICE")}
-                                  className={`flex-1 py-1.5 text-[10px] font-medium rounded-md flex items-center justify-center gap-1 transition-all ${previewTab === "OFFICE" ? "bg-white shadow-sm text-primary" : "text-muted-foreground"}`}
+                                  className={`flex-1 py-1.5 text-[10px] font-medium rounded-md flex items-center justify-center gap-1 transition-all ${previewTab === "OFFICE" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+                                  style={previewTab === "OFFICE" ? { color: primaryColor } : {}}
                                 >
                                   <Building className="h-3 w-3" /> Office
                                 </button>
                                 <button 
                                   type="button"
                                   onClick={() => setPreviewTab("PERSONAL")}
-                                  className={`flex-1 py-1.5 text-[10px] font-medium rounded-md flex items-center justify-center gap-1 transition-all ${previewTab === "PERSONAL" ? "bg-white shadow-sm text-primary" : "text-muted-foreground"}`}
+                                  className={`flex-1 py-1.5 text-[10px] font-medium rounded-md flex items-center justify-center gap-1 transition-all ${previewTab === "PERSONAL" ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+                                  style={previewTab === "PERSONAL" ? { color: primaryColor } : {}}
                                 >
                                   <User className="h-3 w-3" /> Personal
                                 </button>
@@ -653,7 +834,7 @@ export default function DashboardProfile() {
                                 ) : (
                                   links.filter(l => (l.category || "PERSONAL") === previewTab).map(l => (
                                     <div key={l.id} className="flex items-center p-2 rounded-lg bg-white border border-slate-100 shadow-sm">
-                                       <div className="bg-slate-50 p-1.5 rounded-full mr-2 text-slate-500">
+                                       <div className="bg-slate-50 p-1.5 rounded-full mr-2 text-slate-500" style={{ color: secondaryColor }}>
                                           {getIcon(l.type)}
                                        </div>
                                        <div className="flex-1 min-w-0">
@@ -674,38 +855,21 @@ export default function DashboardProfile() {
               </CardContent>
            </Card>
            
-           <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Theme Colors</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    <Label>Primary Color</Label>
-                    <div className="flex gap-2">
-                      <div className="relative w-10 h-10 rounded-md overflow-hidden border shadow-sm">
-                        <input
-                          type="color"
-                          name="primaryColor"
-                          form="profile-form"
-                          value={primaryColor}
-                          onChange={(e) => setPrimaryColor(e.target.value)}
-                          className="absolute -top-2 -left-2 w-16 h-16 p-0 border-0 cursor-pointer"
-                        />
-                      </div>
-                      <Input
-                        value={primaryColor}
-                        onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="flex-1 uppercase font-mono"
-                        maxLength={7}
-                        form="profile-form"
-                        name="primaryColor"
-                      />
-                    </div>
-                </div>
-              </CardContent>
-           </Card>
+           {/* Theme Colors - MOVED TO PROFILE SETTINGS CARD */}
         </div>
       </div>
+
+      <ImageCropper
+        open={cropModalOpen}
+        imageSrc={croppingImage}
+        aspect={cropType === "avatar" ? 1 : 3} // Avatar 1:1, Banner 3:1
+        cropShape={cropType === "avatar" ? "round" : "rect"}
+        onCancel={() => {
+          setCropModalOpen(false);
+          setCroppingImage(null);
+        }}
+        onCropComplete={handleCropComplete}
+      />
     </div>
   );
 }

@@ -75,7 +75,11 @@ export function SystemConfig({ user }: { user: { role: string } }) {
               <span className="text-sm font-medium text-slate-700">
                 {invitationOnly ? "Enabled" : "Disabled"}
               </span>
-              <Switch checked={invitationOnly} onCheckedChange={handleToggle} className="data-[state=unchecked]:bg-slate-300" />
+              <Switch 
+                checked={invitationOnly} 
+                onCheckedChange={handleToggle} 
+                className="data-[state=unchecked]:bg-slate-200 data-[state=checked]:bg-teal-600" 
+              />
             </div>
           </div>
         ) : (

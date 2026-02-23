@@ -39,6 +39,11 @@ model InviteCode {
   userId    String?  @unique
   role      String   @default("INDIVIDUAL")
   email     String?
+  
+  // For Business Admin Invites
+  organizationName String?
+  organizationSlug String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

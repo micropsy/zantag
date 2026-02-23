@@ -53,8 +53,18 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const db = getDb(context);
 
   try {
-    // 1. Verify Invite Code if in Invitation Only Mode
-    if (isInvitationOnly && inviteCode) {
+    // 1. Verify Invite Code
+    let inviteRole = "INDIVIDUAL";
+    let inviteOrgName: string | undefined;
+    let inviteOrgSlug: string | undefined;
+
+    // If invitation only, code is required
+    if (isInvitationOnly && !inviteCode) {
+      return json({ error: "Invite Code is required." }, { status: 400 });
+    }
+
+    // If code provided, verify it
+    if (inviteCode) {
       const validCode = await db.inviteCode.findUnique({
         where: { code: inviteCode as string },
       });
@@ -66,6 +76,14 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       if (validCode.isUsed) {
         return json({ error: "Invite code has already been used." }, { status: 400 });
       }
+      
+      inviteRole = validCode.role;
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Prisma types might lag
+      inviteOrgName = validCode.organizationName || undefined;
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      inviteOrgSlug = validCode.organizationSlug || undefined;
     }
 
     // 2. Check if email already exists
@@ -87,17 +105,31 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     const newUser = await createUser(context, {
       email,
       passwordHash: hashedPassword,
-      inviteCode: isInvitationOnly ? (inviteCode as string) : undefined
+      inviteCode: (inviteCode as string) || undefined,
+      role: inviteRole
     });
     
-    // Update verification token (since createUser doesn't set it)
-    await db.user.update({
-      where: { id: newUser.id },
-      data: { verificationToken }
-    });
+    // Create Organization if Business Admin
+    if (inviteRole === "BUSINESS_ADMIN" && inviteOrgName && inviteOrgSlug) {
+      // Check if slug is taken
+      const existingOrg = await db.organization.findUnique({ where: { slug: inviteOrgSlug }});
+      
+      let finalSlug = inviteOrgSlug;
+      if (existingOrg) {
+         finalSlug = `${inviteOrgSlug}-${Math.floor(Math.random() * 1000)}`;
+      }
 
-    // 4. Mark invite code as used if applicable
-    if (isInvitationOnly && inviteCode) {
+      await db.organization.create({
+        data: {
+          name: inviteOrgName,
+          slug: finalSlug,
+          adminId: newUser.id
+        }
+      });
+    }
+    
+    // Mark invite as used
+    if (inviteCode) {
       await db.inviteCode.update({
         where: { code: inviteCode as string },
         data: {
@@ -106,6 +138,12 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         },
       });
     }
+    
+    // Update verification token (since createUser doesn't set it)
+    await db.user.update({
+      where: { id: newUser.id },
+      data: { verificationToken }
+    });
 
     // 5. Send Verification Email
     const verifyUrl = `${new URL(request.url).origin}/verify?token=${verificationToken}`;

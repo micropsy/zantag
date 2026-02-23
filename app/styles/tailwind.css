@@ -8,6 +8,7 @@
   --color-secondary-end: #3B82F6;
   
   --color-accent: #94A3B8;
+  --color-accent-foreground: #0F172A;
   
   --color-background: #F8FAFC;
   --color-foreground: #0F172A;
@@ -34,6 +35,15 @@
   --color-destructive-foreground: #F8FAFC;
   
   --color-ring: #0F172A;
+
+  --color-sidebar-background: #F8FAFC;
+  --color-sidebar-foreground: #0F172A;
+  --color-sidebar-primary: #0F172A;
+  --color-sidebar-primary-foreground: #FFFFFF;
+  --color-sidebar-accent: #F1F5F9;
+  --color-sidebar-accent-foreground: #0F172A;
+  --color-sidebar-border: #E2E8F0;
+  --color-sidebar-ring: #0F172A;
   
   --font-sans: "Inter", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif";
   

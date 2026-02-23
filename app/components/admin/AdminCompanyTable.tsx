@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Save, Trash2 } from "lucide-react";
 
 type OrgRow = {
   id: string;
@@ -84,12 +86,21 @@ export function AdminCompanyTable({ initial, admins }: { initial: OrgRow[]; admi
                 </select>
               </td>
               <td className="p-3 text-right space-x-2">
-                <button disabled={loadingId === o.id} className="px-3 py-1 rounded bg-slate-900 text-white" onClick={() => save(o.id)}>
-                  Save
-                </button>
-                <button disabled={loadingId === o.id} className="px-3 py-1 rounded border" onClick={() => remove(o.id)}>
-                  Delete
-                </button>
+                <Button 
+                  size="sm"
+                  disabled={loadingId === o.id} 
+                  onClick={() => save(o.id)}
+                >
+                  <Save className="h-4 w-4 mr-1" /> Save
+                </Button>
+                <Button 
+                  variant="destructive"
+                  size="sm"
+                  disabled={loadingId === o.id} 
+                  onClick={() => remove(o.id)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                </Button>
               </td>
             </tr>
           ))}

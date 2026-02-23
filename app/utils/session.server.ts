@@ -27,7 +27,7 @@ function getSessionStorage(context?: AppLoadContext) {
       path: "/",
       sameSite: "lax",
       secrets: [secret],
-      secure: true, // Always true for Cloudflare Pages
+      secure: process.env.NODE_ENV === "production", // Only secure in production
     },
   });
 }

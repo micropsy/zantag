@@ -20,7 +20,7 @@ export const sessionStorage = createCookieSessionStorage<SessionData, SessionFla
     path: "/",
     sameSite: "lax",
     secrets: [SESSION_SECRET], // In production, this should come from context.cloudflare.env
-    secure: true, // Always true for Cloudflare Pages
+    secure: process.env.NODE_ENV === "production", // Only secure in production
   },
 });
 

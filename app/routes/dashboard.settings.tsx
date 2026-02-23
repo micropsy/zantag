@@ -32,11 +32,55 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   if (intent === "delete-account") {
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, shortCode: true }
+      include: { 
+        profile: true,
+        organizationsAdmin: true
+      }
     });
 
     if (!user) {
       return json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Business Admin Checks
+    if (user.role === "BUSINESS_ADMIN") {
+      const companyId = user.profile?.companyId;
+      
+      if (companyId) {
+        // Check for other admins in the same company
+        const otherAdmins = await db.profile.findMany({
+          where: {
+            companyId: companyId,
+            user: {
+              role: "BUSINESS_ADMIN",
+              id: { not: userId } // Exclude current user
+            }
+          },
+          include: {
+            user: true
+          }
+        });
+
+        if (otherAdmins.length === 0) {
+          return json({ 
+            error: "Cannot delete account. You are the only Business Admin for this organization. Please assign another admin before deleting your account." 
+          }, { status: 400 });
+        }
+
+        // If this user is the owner (adminId) of the organization, transfer ownership
+        // We check organizationsAdmin array which contains orgs where this user is adminId
+        if (user.organizationsAdmin.length > 0) {
+          const newAdminId = otherAdmins[0].userId; // Pick the first available admin
+          
+          for (const org of user.organizationsAdmin) {
+            await db.organization.update({
+              where: { id: org.id },
+              data: { adminId: newAdminId }
+            });
+            console.log(`Transferred ownership of organization ${org.id} to user ${newAdminId}`);
+          }
+        }
+      }
     }
 
     // R2 Deletion Logic
@@ -47,16 +91,12 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         console.log(`Deleted R2 folder for user ${user.shortCode}`);
       } catch (error) {
         console.error("Failed to delete R2 folder:", error);
-        // We continue to delete the account even if R2 deletion fails?
-        // User said "R2 ... delete". If it fails, maybe we should log it but proceed?
-        // Or fail? Let's proceed but log.
       }
     } else {
       console.log(`Skipping R2 deletion for user ${user.id} with role ${user.role}`);
     }
 
     // Clean up non-cascading relations
-    // InviteCode does not have onDelete: Cascade in schema
     try {
       await db.inviteCode.deleteMany({
         where: { userId: userId }

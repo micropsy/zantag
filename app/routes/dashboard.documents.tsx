@@ -41,7 +41,10 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   // Verify profile ownership
   const profile = await db.profile.findUnique({
     where: { userId },
-    select: { id: true }
+    select: { 
+      id: true,
+      user: { select: { shortCode: true } }
+    }
   });
 
   if (!profile) {
@@ -65,7 +68,9 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffer = await new Blob(chunks as any).arrayBuffer();
     
-    const key = `${profile.id}/${Date.now()}-${filename}`;
+    // Use shortCode for folder if available, fallback to profile ID
+    const folder = profile.user.shortCode || profile.id;
+    const key = `${folder}/${Date.now()}-${filename}`;
     
     // Use R2 binding
     if (!bucket) {
@@ -228,15 +233,22 @@ export default function DashboardDocuments() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                    <a href={doc.url} target="_blank" rel="noreferrer" className="p-2 text-muted-foreground hover:text-foreground">
-                                        <ExternalLink className="h-4 w-4" />
-                                    </a>
+                                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                        <a href={doc.url} target="_blank" rel="noreferrer">
+                                            <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                    </Button>
                                     <fetcher.Form method="post">
                                         <input type="hidden" name="intent" value="delete-document" />
                                         <input type="hidden" name="documentId" value={doc.id} />
-                                        <button type="submit" className="p-2 text-muted-foreground hover:text-destructive transition-colors">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            type="submit" 
+                                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        >
                                             <Trash2 className="h-4 w-4" />
-                                        </button>
+                                        </Button>
                                     </fetcher.Form>
                                 </div>
                             </div>

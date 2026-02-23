@@ -19,7 +19,13 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const db = getDb(context);
 
   if (request.method === "POST") {
-    const { email, role, code } = await request.json() as { email?: string; role?: string; code?: string };
+    const { email, role, code, organizationName, organizationSlug } = await request.json() as { 
+      email?: string; 
+      role?: string; 
+      code?: string;
+      organizationName?: string;
+      organizationSlug?: string;
+    };
     
     // Generate unique code if not provided
     const newCode = code || `INV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -30,6 +36,12 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
           code: newCode,
           email: email || null,
           role: role || UserRole.INDIVIDUAL,
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore - Prisma types might not be updated in IDE yet
+          organizationName: role === UserRole.BUSINESS_ADMIN ? organizationName : undefined,
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          organizationSlug: role === UserRole.BUSINESS_ADMIN ? organizationSlug : undefined,
           isUsed: false,
         },
       });
