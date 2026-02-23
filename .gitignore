@@ -8,3 +8,4 @@ build
 *.db
 *.db-journal
 *.log
+dist-worker
