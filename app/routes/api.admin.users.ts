@@ -106,6 +106,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       }
 
       const placeholderEmail = `card+${profileId}@cards.local`;
+      const secretKey = crypto.randomUUID();
       const placeholderPasswordHash = await hash(
         `${profileId}-${Date.now().toString()}`,
         10
@@ -118,6 +119,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
           role: "INDIVIDUAL",
           profileId,
           isActivated: false,
+          secretKey,
           status: "ACTIVE",
         },
       });
@@ -149,6 +151,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
           `${profileId}-${Date.now().toString()}-${i}`,
           10
         );
+        const secretKey = crypto.randomUUID();
 
         await db.user.create({
           data: {
@@ -157,6 +160,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
             role: "INDIVIDUAL",
             profileId,
             isActivated: false,
+            secretKey,
             status: "ACTIVE",
           },
         });

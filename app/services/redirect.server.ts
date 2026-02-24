@@ -4,7 +4,7 @@ import { getDomainUrl } from "~/utils/helpers";
 
 type ProfileRedirectResult =
   | { type: "NOT_FOUND" }
-  | { type: "ACTIVATE"; profileId: string }
+  | { type: "ACTIVATE"; profileId: string; secretKey: string | null }
   | { type: "REDIRECT"; url: string };
 
 export async function resolveProfileId(
@@ -29,7 +29,7 @@ export async function resolveProfileId(
   }
 
   if (!user.isActivated) {
-    return { type: "ACTIVATE", profileId };
+    return { type: "ACTIVATE", profileId, secretKey: user.secretKey ?? null };
   }
 
   const username = user.profile?.username;

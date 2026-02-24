@@ -44,7 +44,10 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     );
   }
 
-  if (isInvitationOnly && typeof inviteCode !== "string") {
+  const hasProfileId =
+    typeof profileIdRaw === "string" && profileIdRaw.trim().length > 0;
+
+  if (isInvitationOnly && !hasProfileId && typeof inviteCode !== "string") {
     return json(
       { error: "Invite Code is required." },
       { status: 400 }
@@ -54,18 +57,60 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const db = getDb(context);
 
   try {
-    // 1. Verify Invite Code
     let inviteRole = "INDIVIDUAL";
     let inviteOrgName: string | undefined;
     let inviteOrgSlug: string | undefined;
 
-    // If invitation only, code is required
-    if (isInvitationOnly && !inviteCode) {
-      return json({ error: "Invite Code is required." }, { status: 400 });
+    const profileId =
+      typeof profileIdRaw === "string" && profileIdRaw.trim().length > 0
+        ? profileIdRaw.trim()
+        : undefined;
+
+    const existingCardUser =
+      profileId
+        ? await db.user.findUnique({
+            where: { profileId },
+          })
+        : null;
+
+    let isCardActivation = false;
+
+    if (profileId) {
+      if (typeof inviteCode !== "string" || !inviteCode.trim()) {
+        return json(
+          { error: "Invalid card link. Invite code is missing." },
+          { status: 400 }
+        );
+      }
+
+      if (!existingCardUser) {
+        return json(
+          { error: "Invalid card profile. Please contact support." },
+          { status: 400 }
+        );
+      }
+
+      if (existingCardUser.isActivated) {
+        return json(
+          { error: "This card is already activated. Please login instead." },
+          { status: 400 }
+        );
+      }
+
+      if (
+        !existingCardUser.secretKey ||
+        existingCardUser.secretKey !== inviteCode
+      ) {
+        return json(
+          { error: "Invalid invite code for this card." },
+          { status: 400 }
+        );
+      }
+
+      isCardActivation = true;
     }
 
-    // If code provided, verify it
-    if (inviteCode) {
+    if (!isCardActivation && inviteCode) {
       const validCode = await db.inviteCode.findUnique({
         where: { code: inviteCode as string },
       });
@@ -75,12 +120,15 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       }
 
       if (validCode.isUsed) {
-        return json({ error: "Invite code has already been used." }, { status: 400 });
+        return json(
+          { error: "Invite code has already been used." },
+          { status: 400 }
+        );
       }
-      
+
       inviteRole = validCode.role;
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore - Prisma types might lag
+      // @ts-ignore
       inviteOrgName = validCode.organizationName || undefined;
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
@@ -98,33 +146,14 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       );
     }
 
-    const profileId =
-      typeof profileIdRaw === "string" && profileIdRaw.trim().length > 0
-        ? profileIdRaw.trim()
-        : undefined;
-
-    const existingProfileUser =
-      profileId
-        ? await db.user.findUnique({
-            where: { profileId },
-          })
-        : null;
-
     const hashedPassword = await hash(password, 10);
     const verificationToken = crypto.randomUUID();
 
     let newUser;
 
-    if (existingProfileUser) {
-      if (existingProfileUser.isActivated) {
-        return json(
-          { error: "This card is already activated. Please login instead." },
-          { status: 400 }
-        );
-      }
-
+    if (isCardActivation && existingCardUser) {
       newUser = await db.user.update({
-        where: { id: existingProfileUser.id },
+        where: { id: existingCardUser.id },
         data: {
           email,
           password: hashedPassword,
@@ -137,7 +166,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       newUser = await createUser(context, {
         email,
         passwordHash: hashedPassword,
-        inviteCode: (inviteCode as string) || undefined,
+        inviteCode: typeof inviteCode === "string" ? inviteCode : undefined,
         role: inviteRole,
         profileId,
       });
@@ -147,28 +176,27 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         data: { verificationToken },
       });
     }
-    
-    // Create Organization if Business Admin
+
     if (inviteRole === "BUSINESS_ADMIN" && inviteOrgName && inviteOrgSlug) {
-      // Check if slug is taken
-      const existingOrg = await db.organization.findUnique({ where: { slug: inviteOrgSlug }});
-      
+      const existingOrg = await db.organization.findUnique({
+        where: { slug: inviteOrgSlug },
+      });
+
       let finalSlug = inviteOrgSlug;
       if (existingOrg) {
-         finalSlug = `${inviteOrgSlug}-${Math.floor(Math.random() * 1000)}`;
+        finalSlug = `${inviteOrgSlug}-${Math.floor(Math.random() * 1000)}`;
       }
 
       await db.organization.create({
         data: {
           name: inviteOrgName,
           slug: finalSlug,
-          adminId: newUser.id
-        }
+          adminId: newUser.id,
+        },
       });
     }
-    
-    // Mark invite as used
-    if (inviteCode) {
+
+    if (!isCardActivation && inviteCode) {
       await db.inviteCode.update({
         where: { code: inviteCode as string },
         data: {
@@ -177,10 +205,9 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         },
       });
     }
-    
-    // 5. Send Verification Email
+
     const verifyUrl = `${new URL(request.url).origin}/verify?token=${verificationToken}`;
-    
+
     await sendEmail(context, {
       to: email,
       subject: "Verify your email address",
@@ -189,7 +216,6 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     });
 
     return redirect(`/verify-sent?email=${email}`);
-
   } catch (error) {
     console.error("Signup error:", error);
     return json(
@@ -205,8 +231,12 @@ export default function Signup() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [searchParams] = useSearchParams();
-  const defaultInviteCode = searchParams.get("invite") || "";
   const profileId = searchParams.get("profileId") || "";
+  const defaultInviteCode =
+    searchParams.get("inviteCode") ||
+    searchParams.get("invite") ||
+    "";
+  const isCardActivation = Boolean(profileId && defaultInviteCode);
 
   useEffect(() => {
     if (actionData?.error) {
@@ -234,6 +264,18 @@ export default function Signup() {
 
           <Form method="post" className="space-y-6">
             <input type="hidden" name="profileId" value={profileId} />
+            {profileId && (
+              <div className="space-y-2">
+                <Label htmlFor="profileIdDisplay">Profile ID</Label>
+                <Input
+                  id="profileIdDisplay"
+                  name="profileIdDisplay"
+                  value={profileId}
+                  readOnly
+                  className="bg-slate-50 border-slate-200"
+                />
+              </div>
+            )}
             {isInvitationOnly && (
               <div className="space-y-2">
                 <Label htmlFor="inviteCode">Invite Code</Label>
@@ -244,6 +286,7 @@ export default function Signup() {
                   defaultValue={defaultInviteCode}
                   placeholder="Enter your invite code"
                   className="bg-slate-50 border-slate-200"
+                  readOnly={isCardActivation}
                 />
               </div>
             )}

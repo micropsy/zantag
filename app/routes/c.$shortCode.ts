@@ -18,7 +18,12 @@ export const loader = async ({ request, params, context }: LoaderFunctionArgs) =
 
     if (result.type === "ACTIVATE") {
       const domainUrl = getDomainUrl(request, context);
-      const activationUrl = `${domainUrl}/register?profileId=${encodeURIComponent(result.profileId)}`;
+      const params = new URLSearchParams();
+      params.set("profileId", result.profileId);
+      if (result.secretKey) {
+        params.set("inviteCode", result.secretKey);
+      }
+      const activationUrl = `${domainUrl}/register?${params.toString()}`;
       return redirect(activationUrl);
     }
 
