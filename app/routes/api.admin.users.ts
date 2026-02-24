@@ -1,4 +1,4 @@
-import { type ActionFunctionArgs, json } from "@remix-run/cloudflare";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, json } from "@remix-run/cloudflare";
 import { hash } from "bcrypt-ts";
 import { getDb } from "~/utils/db.server";
 import { requireAdmin } from "~/utils/session.server";
@@ -6,36 +6,41 @@ import { removeStaff } from "~/services/business.server";
 import { deleteUserFolder } from "~/services/storage.server";
 import { generateUniqueProfileId } from "~/services/user.server";
 
-export const action = async ({ request, context }: ActionFunctionArgs) => {
+export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const currentUser = await requireAdmin(request, context);
   const db = getDb(context);
 
-  if (request.method === "GET") {
-    const url = new URL(request.url);
-    const intent = url.searchParams.get("intent");
+  const url = new URL(request.url);
+  const intent = url.searchParams.get("intent");
 
-    if (intent === "card-list") {
-      if (currentUser.role !== "SUPER_ADMIN") {
-        return json({ error: "Not authorized" }, { status: 403 });
-      }
-
-      const cards = await db.user.findMany({
-        where: {
-          isActivated: false,
-          profileId: { not: null },
-        },
-        orderBy: { createdAt: "desc" },
-        select: {
-          profileId: true,
-          createdAt: true,
-        },
-      });
-
-      return json(cards);
+  if (intent === "card-list") {
+    if (currentUser.role !== "SUPER_ADMIN") {
+      return json({ error: "Not authorized" }, { status: 403 });
     }
 
-    return json({ error: "Invalid intent" }, { status: 400 });
+    const cards = await db.user.findMany({
+      where: {
+        isActivated: false,
+        profileId: { not: null },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        profileId: true,
+        createdAt: true,
+      },
+    });
+
+    // Even if no rows are found, Prisma returns [], so the client will
+    // always receive an array rather than an error for this intent.
+    return json(cards);
   }
+
+  return json({ error: "Invalid intent" }, { status: 400 });
+};
+
+export const action = async ({ request, context }: ActionFunctionArgs) => {
+  const currentUser = await requireAdmin(request, context);
+  const db = getDb(context);
 
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
