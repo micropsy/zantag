@@ -4,7 +4,6 @@ import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Users, Eye, MousePointer2 } from "lucide-react";
-import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request, context);
@@ -207,4 +206,4 @@ function FileTextIcon(props: React.ComponentProps<"svg">) {
     )
   }
 
-export { RouteErrorBoundary as ErrorBoundary };
+

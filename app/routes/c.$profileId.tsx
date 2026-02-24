@@ -20,10 +20,7 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
 
   if (!user.isActivated) {
     const searchParams = new URLSearchParams();
-    searchParams.set("profileId", profileId);
-    if (user.secretKey) {
-      searchParams.set("inviteCode", user.secretKey);
-    }
+    searchParams.set("id", profileId);
     return redirect(`/register?${searchParams.toString()}`);
   }
 

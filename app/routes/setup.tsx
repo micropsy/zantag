@@ -4,7 +4,6 @@ import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { User } from "lucide-react";
 import { profileSchema } from "~/utils/schemas";
-import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request, context);
@@ -166,4 +165,4 @@ export default function Setup() {
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary };
+

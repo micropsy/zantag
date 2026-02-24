@@ -11,8 +11,6 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
-
 import { createUser } from "~/services/user.server";
 
 import { isInvitationOnlyMode } from "~/utils/settings.server";
@@ -266,7 +264,8 @@ export default function Register() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [searchParams] = useSearchParams();
-  const profileId = searchParams.get("profileId") || "";
+  // Support both legacy `profileId` and new canonical `id` query keys.
+  const profileId = searchParams.get("id") || searchParams.get("profileId") || "";
   const defaultInviteCode =
     searchParams.get("inviteCode") ||
     searchParams.get("invite") ||
@@ -398,4 +397,4 @@ export default function Register() {
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary };
+

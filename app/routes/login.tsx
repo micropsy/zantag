@@ -9,7 +9,6 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await getUserId(request, context);
@@ -182,4 +181,4 @@ export default function Login() {
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary };
+

@@ -36,6 +36,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
           name: true,
           email: true,
           role: true,
+          profileId: true,
         }
       },
       company: {
@@ -165,8 +166,8 @@ export default function DashboardIndex() {
   const userName = profile.user?.name || profile.displayName || "there";
 
   // Calculate profile URL
-  // Use Master Link (Custom Username) as primary
-  const profileUrl = `${domainUrl}/user/${profile.username}`;
+  // Use profileId (canonical ZanTag ID) as primary for public card.
+  const profileUrl = `${domainUrl}/p/${profile.user?.profileId ?? profile.id}`;
 
   return (
     <div className="space-y-8">

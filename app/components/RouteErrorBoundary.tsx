@@ -1,40 +1,48 @@
-import { isRouteErrorResponse, useRouteError, Link } from "@remix-run/react";
-import { AlertTriangle } from "lucide-react";
+import { isRouteErrorResponse, useRouteError } from "@remix-run/react";
 
 export function RouteErrorBoundary() {
   const error = useRouteError();
-  
+
   let title = "Something went wrong";
-  let message = "An unexpected error occurred.";
+  let message = "An unexpected error occurred. Please try again.";
+  let status: number | undefined;
 
   if (isRouteErrorResponse(error)) {
-    title = `${error.status} ${error.statusText}`;
-    message = error.data as string;
+    status = error.status;
+    title = error.statusText || title;
+    try {
+      // Try to read a JSON error body if present
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = error.data;
+      if (data?.error && typeof data.error === "string") {
+        message = data.error;
+      } else if (typeof data === "string") {
+        message = data;
+      }
+    } catch {
+      // ignore parse issues and fall back to defaults
+    }
   } else if (error instanceof Error) {
-    message = error.message;
+    message = error.message || message;
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center bg-white rounded-lg border border-slate-200 shadow-sm m-4">
-      <div className="bg-rose-50 p-4 rounded-full mb-4">
-        <AlertTriangle className="w-10 h-10 text-rose-600" />
-      </div>
-      <h2 className="text-xl font-bold text-slate-900 mb-2">{title}</h2>
-      <p className="text-slate-500 max-w-md mb-6">{message}</p>
-      <div className="flex gap-4">
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium"
-        >
-          Try Again
-        </button>
-        <Link
-          to="/dashboard"
-          className="px-4 py-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
-        >
-          Back to Dashboard
-        </Link>
+    <div className="min-h-[60vh] flex items-center justify-center bg-slate-50 px-4">
+      <div className="max-w-md w-full bg-white shadow-sm rounded-2xl border border-slate-200 p-8 text-center space-y-4">
+        <div className="inline-flex items-center justify-center rounded-full bg-rose-50 text-rose-600 w-10 h-10 text-sm font-semibold mb-2">
+          !
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-semibold text-slate-900">
+            {status ? `${status} – ${title}` : title}
+          </h1>
+          <p className="text-sm text-slate-600 whitespace-pre-line">{message}</p>
+        </div>
+        <p className="text-xs text-slate-400 mt-2">
+          If this keeps happening, please contact support.
+        </p>
       </div>
     </div>
   );
 }
+

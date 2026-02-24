@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/com
 import { FileText, Trash2, ExternalLink, Upload, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "~/components/dashboard/EmptyState";
-import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request);
@@ -261,4 +260,4 @@ export default function DashboardDocuments() {
   );
 }
 
-export { RouteErrorBoundary as ErrorBoundary };
+
