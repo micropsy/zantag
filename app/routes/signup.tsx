@@ -34,6 +34,11 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 
   const isInvitationOnly = await isInvitationOnlyMode(context);
 
+  const hasProfileId =
+    typeof profileIdRaw === "string" && profileIdRaw.trim().length > 0;
+  const hasInviteCode =
+    typeof inviteCode === "string" && inviteCode.trim().length > 0;
+
   if (
     typeof email !== "string" ||
     typeof password !== "string"
@@ -44,12 +49,9 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     );
   }
 
-  const hasProfileId =
-    typeof profileIdRaw === "string" && profileIdRaw.trim().length > 0;
-
-  if (isInvitationOnly && !hasProfileId && typeof inviteCode !== "string") {
+  if (isInvitationOnly && (!hasProfileId || !hasInviteCode)) {
     return json(
-      { error: "Invite Code is required." },
+      { error: "Registration is by invitation only." },
       { status: 400 }
     );
   }
@@ -77,6 +79,13 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 
     if (profileId) {
       if (typeof inviteCode !== "string" || !inviteCode.trim()) {
+        if (isInvitationOnly) {
+          return json(
+            { error: "Registration is by invitation only." },
+            { status: 400 }
+          );
+        }
+
         return json(
           { error: "Invalid card link. Invite code is missing." },
           { status: 400 }
@@ -84,6 +93,13 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       }
 
       if (!existingCardUser) {
+        if (isInvitationOnly) {
+          return json(
+            { error: "Registration is by invitation only." },
+            { status: 400 }
+          );
+        }
+
         return json(
           { error: "Invalid card profile. Please contact support." },
           { status: 400 }
@@ -101,6 +117,13 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         !existingCardUser.secretKey ||
         existingCardUser.secretKey !== inviteCode
       ) {
+        if (isInvitationOnly) {
+          return json(
+            { error: "Registration is by invitation only." },
+            { status: 400 }
+          );
+        }
+
         return json(
           { error: "Invalid invite code for this card." },
           { status: 400 }
@@ -171,6 +194,18 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         profileId,
       });
 
+      if (
+        !isInvitationOnly &&
+        !profileId &&
+        (!inviteCode || typeof inviteCode !== "string" || !inviteCode.trim())
+      ) {
+        const secretKey = crypto.randomUUID();
+        await db.user.update({
+          where: { id: newUser.id },
+          data: { secretKey },
+        });
+      }
+
       await db.user.update({
         where: { id: newUser.id },
         data: { verificationToken },
@@ -237,6 +272,7 @@ export default function Signup() {
     searchParams.get("invite") ||
     "";
   const isCardActivation = Boolean(profileId && defaultInviteCode);
+  const showInviteCodeField = isInvitationOnly && Boolean(profileId);
 
   useEffect(() => {
     if (actionData?.error) {
@@ -262,6 +298,12 @@ export default function Signup() {
             </p>
           </div>
 
+          {isInvitationOnly && !profileId && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+              Registration is by invitation only. Scan your ZanTag card to continue.
+            </p>
+          )}
+
           <Form method="post" className="space-y-6">
             <input type="hidden" name="profileId" value={profileId} />
             {profileId && (
@@ -276,7 +318,7 @@ export default function Signup() {
                 />
               </div>
             )}
-            {isInvitationOnly && (
+            {showInviteCodeField && (
               <div className="space-y-2">
                 <Label htmlFor="inviteCode">Invite Code</Label>
                 <Input
