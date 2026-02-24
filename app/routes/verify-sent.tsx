@@ -17,7 +17,7 @@ export default function VerifySent() {
           Please check your inbox to continue.
         </p>
         <div className="text-sm text-slate-400">
-          Didn&apos;t receive the email? <Link to="/signup" className="text-primary hover:underline">Try again</Link>
+          Didn&apos;t receive the email? <Link to="/register" className="text-primary hover:underline">Try again</Link>
         </div>
       </div>
     </div>

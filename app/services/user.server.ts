@@ -131,11 +131,13 @@ export async function resolveUsernameRedirect(context: AppLoadContext, username:
     return null;
   }
 
-  // Dynamic Switch Logic
   if (profile.user.role === "BUSINESS_STAFF" && profile.company && profile.user.status === "ACTIVE") {
     return `/b/${profile.company.slug}/${profile.username}`;
   }
 
-  // Default to Individual Profile
-  return `/p/${profile.username}`;
+  if (!profile.user.profileId) {
+    return null;
+  }
+
+  return `/p/${profile.user.profileId}`;
 }

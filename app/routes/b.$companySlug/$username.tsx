@@ -45,8 +45,11 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   
   // 4. Check if user is active/separated
   if (profile.user.status === "INACTIVE") {
-      // User is now a permanent Individual, redirect to their personal profile
-      return redirect(`/p/${username}`);
+      const profileId = profile.user.profileId;
+      if (!profileId) {
+        throw new Response("Profile not found", { status: 404 });
+      }
+      return redirect(`/p/${profileId}`);
   }
 
   if (profile.user.status === "GRACE_PERIOD" && profile.user.separatedAt) {
@@ -55,8 +58,11 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
       if (diffDays > 30) {
-         // Grace period over, treated as permanent Individual
-         return redirect(`/p/${username}`);
+         const profileId = profile.user.profileId;
+         if (!profileId) {
+           throw new Response("Profile not found", { status: 404 });
+         }
+         return redirect(`/p/${profileId}`);
       }
       // If within 30 days, they are still shown as staff (or maybe with a warning?)
       // For now, we show them as staff until deleted or finalized.

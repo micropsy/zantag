@@ -32,7 +32,7 @@ export default function Index() {
             Create a stunning digital business card, manage your leads, and share documents with ease. The all-in-one platform for modern professionals.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Link to={isInvitationOnly ? "/signup" : "/signup"}>
+            <Link to="/register">
               <Button size="lg" className="bg-[#0F172A] hover:bg-slate-800 text-white px-8 h-14 text-lg">
                 {isInvitationOnly ? "Redeem Invitation" : "Get Started"} <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -132,7 +132,7 @@ export default function Index() {
             <p className="text-slate-300 mb-10 text-lg">
               Join thousands of professionals who are making better connections with ZanTag.
             </p>
-            <Link to="/signup">
+            <Link to="/register">
               <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 px-8 h-14 text-lg font-bold">
                 Get Started for Free
               </Button>

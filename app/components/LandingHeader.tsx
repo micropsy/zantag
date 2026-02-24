@@ -24,7 +24,7 @@ export function LandingHeader({ isInvitationOnly }: LandingHeaderProps) {
           <Link to="/login">
             <Button variant="ghost">Login</Button>
           </Link>
-          <Link to="/signup">
+          <Link to="/register">
             <Button className="bg-[#06B6D4] hover:bg-[#0891B2] text-white">
               {isInvitationOnly ? "Redeem Invite" : "Get Started"}
             </Button>
@@ -51,7 +51,7 @@ export function LandingHeader({ isInvitationOnly }: LandingHeaderProps) {
               Login
             </Button>
           </Link>
-          <Link to="/signup" onClick={() => setIsOpen(false)}>
+          <Link to="/register" onClick={() => setIsOpen(false)}>
             <Button className="w-full justify-center h-12 text-lg bg-[#06B6D4] hover:bg-[#0891B2] text-white">
               {isInvitationOnly ? "Redeem Invite" : "Get Started"}
             </Button>
