@@ -166,8 +166,9 @@ export default function DashboardIndex() {
   const userName = profile.user?.name || profile.displayName || "there";
 
   // Calculate profile URL
-  // Use profileId (canonical ZanTag ID) as primary for public card.
-  const profileUrl = `${domainUrl}/p/${profile.user?.profileId ?? profile.id}`;
+  // Use /c/ (Permanent Link) for the Public Card button as it handles
+  // all necessary redirections (username, business, etc.)
+  const profileUrl = `${domainUrl}/c/${profile.user?.profileId ?? profile.id}`;
 
   return (
     <div className="space-y-8">

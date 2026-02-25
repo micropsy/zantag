@@ -36,11 +36,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
           code: newCode,
           email: email || null,
           role: role || UserRole.INDIVIDUAL,
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore - Prisma types might not be updated in IDE yet
           organizationName: role === UserRole.BUSINESS_ADMIN ? organizationName : undefined,
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
           organizationSlug: role === UserRole.BUSINESS_ADMIN ? organizationSlug : undefined,
           isUsed: false,
         },

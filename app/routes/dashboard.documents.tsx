@@ -65,10 +65,17 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       chunks.push(chunk);
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const buffer = await new Blob(chunks as any).arrayBuffer();
+    const buffer = await new Blob(chunks as any[]).arrayBuffer();
     
-    const folder = profile.user.profileId || profile.id;
-    const key = `${folder}/${Date.now()}-${filename}`;
+    // Explicitly check for profileId and fallback to profile.id (internal ID)
+    const folder = profile.user?.profileId || profile.id;
+    
+    if (!folder || folder === "null") {
+        console.error("Critical: folder name for R2 is missing or 'null' string", { folder, profileId: profile.id });
+        return undefined;
+    }
+
+    const key = `${folder}/documents/${Date.now()}-${filename}`;
     
     // Use R2 binding
     if (!bucket) {

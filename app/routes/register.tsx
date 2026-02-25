@@ -148,11 +148,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       }
 
       inviteRole = validCode.role;
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       inviteOrgName = validCode.organizationName || undefined;
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       inviteOrgSlug = validCode.organizationSlug || undefined;
     }
 

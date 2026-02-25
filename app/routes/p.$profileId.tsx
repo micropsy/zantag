@@ -1,13 +1,20 @@
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useLoaderData } from "@remix-run/react";
-import { type LoaderFunctionArgs, json, redirect } from "@remix-run/cloudflare";
+import { type LoaderFunctionArgs, json, redirect, type SerializeFrom } from "@remix-run/cloudflare";
+import { type User as PrismaUser, type Profile as PrismaProfile, type Link as PrismaLink, type Document as PrismaDocument, type Organization } from "@prisma/client";
 import { getDb } from "~/utils/db.server";
 import { Avatar, AvatarImage, AvatarFallback } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Globe, Mail, FileText, Download, Phone, MapPin, Link as LinkIcon, Building, User, Share2 } from "lucide-react";
 import { ConnectDialog } from "~/components/public/ConnectDialog";
+
+type ProfileWithRelations = PrismaProfile & {
+  user: Pick<PrismaUser, "id" | "name" | "email" | "profileId" | "isActivated">;
+  links: PrismaLink[];
+  documents: PrismaDocument[];
+  company: Pick<Organization, "id" | "name" | "slug"> | null;
+};
 
 export const loader = async ({ params, context, request }: LoaderFunctionArgs) => {
   const { profileId } = params;
@@ -18,7 +25,8 @@ export const loader = async ({ params, context, request }: LoaderFunctionArgs) =
 
   const db = getDb(context);
 
-  const user = await db.user.findUnique({
+  // Try to find by profileId first
+  let user = await db.user.findUnique({
     where: { profileId },
     include: {
       profile: {
@@ -32,15 +40,46 @@ export const loader = async ({ params, context, request }: LoaderFunctionArgs) =
     },
   });
 
+  // If not found by profileId, try to find by username
+  if (!user) {
+    const profile = await db.profile.findUnique({
+      where: { username: profileId },
+      include: {
+        user: {
+          include: {
+            profile: {
+              include: {
+                links: true,
+                contacts: true,
+                documents: true,
+                company: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (profile?.user) {
+      user = profile.user as unknown as typeof user;
+    }
+  }
+
   if (!user || !user.profile) {
     throw new Response("Profile not found", { status: 404 });
   }
 
   if (!user.isActivated) {
-    throw new Response("Profile not found", { status: 404 });
+    const searchParams = new URLSearchParams();
+    searchParams.set("id", profileId);
+    if (user.secretKey) {
+      searchParams.set("inviteCode", user.secretKey);
+    }
+    return redirect(`/register?${searchParams.toString()}`);
   }
 
-  const profile = user.profile;
+  // Cast to the expected type for the loader
+  const profile = user.profile as unknown as ProfileWithRelations;
 
   const userAgent = request.headers.get("User-Agent") || "";
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
@@ -50,8 +89,11 @@ export const loader = async ({ params, context, request }: LoaderFunctionArgs) =
   return json({ profile, mapProvider });
 };
 
+type SerializedLink = SerializeFrom<PrismaLink>;
+type SerializedDocument = SerializeFrom<PrismaDocument>;
+
 export default function IndividualProfile() {
-  const { profile, mapProvider } = useLoaderData<typeof loader>() as { profile: any; mapProvider: "apple" | "google" };
+  const { profile, mapProvider } = useLoaderData<typeof loader>();
   const { user, links, documents } = profile;
 
   const getIcon = (type: string) => {
@@ -65,7 +107,7 @@ export default function IndividualProfile() {
     }
   };
 
-  const buildHref = (link: any) => {
+  const buildHref = (link: SerializedLink) => {
     const raw = (link.url || "").trim();
 
     if (!raw) return "#";
@@ -95,7 +137,7 @@ export default function IndividualProfile() {
     }
   };
 
-  const getDisplayValue = (link: any) => {
+  const getDisplayValue = (link: SerializedLink) => {
     const raw = (link.url || "").trim();
 
     if (!raw) return "";
@@ -114,7 +156,7 @@ export default function IndividualProfile() {
 
   const renderLinks = (category: "OFFICE" | "PERSONAL") => {
     const filtered = links.filter(
-      (link: any) => (link.category || "PERSONAL") === category
+      (link) => (link.category || "PERSONAL") === category
     );
 
     if (filtered.length === 0) {
@@ -127,7 +169,7 @@ export default function IndividualProfile() {
 
     return (
       <div className="space-y-3">
-        {filtered.map((link: any) => (
+        {filtered.map((link) => (
           <a
             key={link.id}
             href={buildHref(link)}
@@ -243,7 +285,7 @@ export default function IndividualProfile() {
               <div className="mb-8">
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Documents</h2>
                 <div className="space-y-3">
-                  {documents.map((doc: any) => (
+                  {documents.map((doc: SerializedDocument) => (
                     <a 
                       key={doc.id}
                       href={doc.url}

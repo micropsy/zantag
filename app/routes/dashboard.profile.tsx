@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, unstable_parseMultipartFormData, type UploadHandler, unstable_composeUploadHandlers, unstable_createMemoryUploadHandler } from "@remix-run/cloudflare";
+import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, unstable_parseMultipartFormData, type UploadHandler, unstable_composeUploadHandlers, unstable_createMemoryUploadHandler, type SerializeFrom } from "@remix-run/cloudflare";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { useEffect, useState, useRef } from "react";
+import { type Profile as PrismaProfile, type Link as PrismaLink, type User as PrismaUser, type Organization } from "@prisma/client";
 import { getDb } from "~/utils/db.server";
 import { requireUserId } from "~/utils/session.server";
 import { getDomainUrl } from "~/utils/helpers";
@@ -16,6 +16,14 @@ import { Trash2, Link as LinkIcon, Save, Check, X, Loader2, Phone, Mail, Globe, 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { ImageCropper } from "~/components/image-cropper";
+
+type ProfileWithRelations = PrismaProfile & {
+  links: PrismaLink[];
+  user: Pick<PrismaUser, "role" | "profileId" | "name">;
+  company: Pick<Organization, "slug"> | null;
+};
+
+type SerializedLink = SerializeFrom<PrismaLink>;
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await requireUserId(request, context);
@@ -36,7 +44,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
   const domainUrl = getDomainUrl(request, context);
 
-  return json({ profile, domainUrl, env: { R2_PUBLIC_URL: context.cloudflare.env.R2_PUBLIC_URL } });
+  return json({ profile: profile as unknown as ProfileWithRelations, domainUrl, env: { R2_PUBLIC_URL: context.cloudflare.env.R2_PUBLIC_URL } });
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
@@ -56,8 +64,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   }
 
   // Custom Upload Handler for R2
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const uploadHandler: UploadHandler = async ({ name, filename, data, contentType }) => {
+  const uploadHandler: UploadHandler = async ({ name, filename, data }) => {
     if ((name !== "avatar" && name !== "banner") || !filename) {
       return undefined;
     }
@@ -66,23 +73,30 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     for await (const chunk of data) {
       chunks.push(chunk);
     }
-    const buffer = await new Blob(chunks as any).arrayBuffer();
+    const buffer = await new Blob(chunks as BlobPart[]).arrayBuffer();
     
-    const profileId = existingProfile.user.profileId;
+    // Explicitly check for profileId and fallback to userId, ensuring it's never "null" string
+    const profileId = existingProfile.user?.profileId || existingProfile.userId;
+    
+    if (!profileId || profileId === "null") {
+      console.error("Critical: profileId is missing or 'null' string", { profileId, userId: existingProfile.userId });
+      return undefined;
+    }
+
+    // New filename format as requested: folder/type_profileId.png
+    // type is 'profile' for avatar, 'banner' for banner
     const key = `${profileId}/${name === "avatar" ? "profile" : "banner"}_${profileId}.png`;
     
     if (bucket) {
       await bucket.put(key, buffer, {
-        httpMetadata: { contentType: "image/png" } // Enforce PNG content type since we save as .png
+        httpMetadata: { contentType: "image/png" } 
       });
-      // Return the full public URL if configured, otherwise use the local resource route
-      // Append timestamp for cache busting
+      
       const baseUrl = r2PublicUrl ? `${r2PublicUrl}/${key}` : `/images/${key}`;
+      // Append version for cache busting
       return `${baseUrl}?v=${Date.now()}`;
-    } else {
-      console.error("R2 Bucket binding 'BUCKET' is missing in context.cloudflare.env");
-    }
-    
+    } 
+
     return undefined;
   };
 
@@ -120,7 +134,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 
     // Handle Banner Deletion from R2
     if (deleteBanner && bucket) {
-      const profileId = existingProfile.user.profileId;
+      const profileId = existingProfile.user.profileId || existingProfile.userId;
       const key = `${profileId}/banner_${profileId}.png`;
       try {
         await bucket.delete(key);
@@ -131,7 +145,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 
     // 3. Handle Contact Links (JSON)
     const linksDataRaw = formData.get("linksData") as string;
-    let linksData: any[] = [];
+    let linksData: PrismaLink[] = [];
     try {
       linksData = JSON.parse(linksDataRaw || "[]");
     } catch (e) {
@@ -166,7 +180,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         primaryColor: rawData.primaryColor as string || undefined,
         avatarUrl: avatarUrl, // Will be undefined if not string (i.e. not uploaded)
         bannerUrl: deleteBanner ? null : bannerUrl,
-      } as any,
+      },
     });
 
     // Sync Links
@@ -187,7 +201,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     // Create new links
     if (linksData.length > 0) {
       await db.link.createMany({
-        data: linksData.map((link: any) => ({
+        data: linksData.map((link) => ({
           profileId: existingProfile.id,
           title: link.title || link.type, // e.g. "Work Phone"
           url: link.url,
@@ -205,8 +219,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
 };
 
 export default function DashboardProfile() {
-  const data = useLoaderData<typeof loader>() as any;
-  const { profile, domainUrl } = data;
+  const { profile, domainUrl } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state === "submitting";
   
@@ -235,7 +248,7 @@ export default function DashboardProfile() {
   const [croppedBanner, setCroppedBanner] = useState<Blob | null>(null);
 
   // Initialize links state from loaded data
-  const [links, setLinks] = useState<any[]>(profile.links || []);
+  const [links, setLinks] = useState<Partial<SerializedLink>[]>(profile.links || []);
   const [activeTab, setActiveTab] = useState<"OFFICE" | "PERSONAL">("OFFICE");
   const [previewTab, setPreviewTab] = useState<"OFFICE" | "PERSONAL">("OFFICE");
 
@@ -359,7 +372,7 @@ export default function DashboardProfile() {
     }
   };
 
-  const actionData = fetcher.data as { success?: boolean; errors?: Record<string, string[]> };
+  const actionData = fetcher.data as { success?: boolean; errors?: Record<string, string[]> } | undefined;
 
   useEffect(() => {
     if (fetcher.state === "idle" && actionData?.success) {
@@ -492,7 +505,7 @@ export default function DashboardProfile() {
                      <div className="relative">
                        <Avatar className="w-24 h-24 border-4 border-white bg-white shadow-sm">
                          <AvatarImage src={avatarPreview || ""} />
-                         <AvatarFallback className="text-xl">{displayName?.[0] || "U"}</AvatarFallback>
+                         <AvatarFallback>{displayName?.[0] || "U"}</AvatarFallback>
                        </Avatar>
                        <Label htmlFor="avatar-upload" className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full cursor-pointer hover:bg-primary/90 border-2 border-white shadow-sm">
                           <ImageIcon className="h-3 w-3" />
@@ -623,23 +636,23 @@ export default function DashboardProfile() {
                        </div>
                     )}
 
-                    {links.filter(l => l.category === activeTab).map((link: any) => (
+                    {links.filter(l => l.category === activeTab).map((link) => (
                       <div key={link.id} className="flex items-start gap-2 group animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="mt-2.5 text-muted-foreground">
-                          {getIcon(link.type)}
+                          {getIcon(link.type || "")}
                         </div>
                         <div className="flex-1 space-y-2">
                            <div className="flex gap-2">
                              <Input 
                                value={link.title || ""} 
-                               onChange={(e) => updateLink(link.id, "title", e.target.value)}
+                               onChange={(e) => updateLink(link.id!, "title", e.target.value)}
                                placeholder={`${link.type} Label (Optional)`}
                                className="w-1/3 text-xs h-8"
                              />
                              <Input 
-                               value={link.url} 
-                               onChange={(e) => updateLink(link.id, "url", e.target.value)}
-                               placeholder={getPlaceholder(link.type)}
+                               value={link.url || ""} 
+                               onChange={(e) => updateLink(link.id!, "url", e.target.value)}
+                               placeholder={getPlaceholder(link.type || "")}
                                className="flex-1 h-8"
                              />
                            </div>
@@ -649,7 +662,7 @@ export default function DashboardProfile() {
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => removeLink(link.id)}
+                          onClick={() => removeLink(link.id!)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -876,7 +889,7 @@ export default function DashboardProfile() {
                                   links.filter(l => (l.category || "PERSONAL") === previewTab).map(l => (
                                     <div key={l.id} className="flex items-center p-2 rounded-lg bg-white border border-slate-100 shadow-sm">
                                        <div className="bg-slate-50 p-1.5 rounded-full mr-2 text-slate-500" style={{ color: secondaryColor }}>
-                                          {getIcon(l.type)}
+                                          {getIcon(l.type || "")}
                                        </div>
                                        <div className="flex-1 min-w-0">
                                           {l.title && <p className="text-[9px] text-muted-foreground font-bold uppercase">{l.title}</p>}

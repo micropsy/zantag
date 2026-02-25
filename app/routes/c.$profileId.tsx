@@ -12,6 +12,13 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
 
   const user = await db.user.findUnique({
     where: { profileId },
+    include: {
+      profile: {
+        include: {
+          company: true,
+        },
+      },
+    },
   });
 
   if (!user) {
@@ -21,9 +28,26 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   if (!user.isActivated) {
     const searchParams = new URLSearchParams();
     searchParams.set("id", profileId);
+    if (user.secretKey) {
+      searchParams.set("inviteCode", user.secretKey);
+    }
     return redirect(`/register?${searchParams.toString()}`);
   }
 
+  // Redirect to the best public URL
+  if (user.profile) {
+    // If it's a business staff and has a company, use the business URL
+    if (user.role === "BUSINESS_STAFF" && user.profile.company) {
+      return redirect(`/b/${user.profile.company.slug}/${user.profile.username}`);
+    }
+    
+    // Otherwise use the standard username URL
+    if (user.profile.username) {
+      return redirect(`/p/${user.profile.username}`);
+    }
+  }
+
+  // Fallback to the canonical ID URL if no username is set
   return redirect(`/p/${profileId}`);
 };
 

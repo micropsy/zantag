@@ -10,9 +10,21 @@ import { type AppLoadContext } from "@remix-run/cloudflare";
  */
 export function getDomainUrl(request: Request, context?: AppLoadContext): string {
   // 1. Check Environment Variable (Preferred for Production/Consistency)
-  if (context?.cloudflare?.env?.APP_URL) {
+  // Check context (Cloudflare/Pages) first
+  let appUrl = context?.cloudflare?.env?.APP_URL;
+
+  // If not in context, check process.env or import.meta.env (for local dev with some setups)
+  if (!appUrl && typeof process !== "undefined" && process.env?.APP_URL) {
+    appUrl = process.env.APP_URL;
+  }
+  
+  if (!appUrl && typeof (import.meta as unknown as { env: Record<string, string> })?.env?.APP_URL === "string") {
+    appUrl = (import.meta as unknown as { env: Record<string, string> }).env.APP_URL;
+  }
+
+  if (appUrl) {
     // Remove trailing slash if present
-    return context.cloudflare.env.APP_URL.replace(/\/$/, "");
+    return appUrl.replace(/\/$/, "");
   }
 
   // 2. Fallback to Request Host
