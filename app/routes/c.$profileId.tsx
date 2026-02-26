@@ -34,7 +34,7 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
     return redirect(`/register?${searchParams.toString()}`);
   }
 
-  // Redirect to the best public URL
+  // Redirect to the best public URL based on business flow
   if (user.profile) {
     // If it's a business staff and has a company, use the business URL
     if (user.role === "BUSINESS_STAFF" && user.profile.company) {
@@ -50,4 +50,3 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   // Fallback to the canonical ID URL if no username is set
   return redirect(`/p/${profileId}`);
 };
-
