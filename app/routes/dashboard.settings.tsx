@@ -9,7 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { toast } from "sonner";
-import { Lock, LogOut, Mail, User, Github } from "lucide-react";
+import { Lock, LogOut, Mail, User } from "lucide-react";
 import { compare, hash } from "bcrypt-ts";
 import { RouteErrorBoundary } from "~/components/RouteErrorBoundary";
 import { getSession } from "~/utils/session.server";
@@ -245,10 +245,8 @@ export default function DashboardSettings() {
   };
 
   const handleGoogleConnect = () => {
-    fetcher.submit(
-      { intent: "connect-google" },
-      { method: "post" }
-    );
+    const googleAuthUrl = new URL("/auth/google", window.location.origin);
+    window.location.href = googleAuthUrl.toString();
   };
 
   return (
@@ -383,7 +381,12 @@ export default function DashboardSettings() {
               onClick={handleGoogleConnect}
               disabled={isSubmitting}
             >
-              <Github className="mr-2 h-4 w-4" />
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px" height="20px" className="mr-2 h-4 w-4">
+                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,8,3.029V10.18c-3.448-3.337-8.06-5.337-13-5.337c-11.045,0-20,8.955-20,20c0,11.045,8.955,20,20,20c11.045,0,19.119-8.174,19.119-19.22c0-1.181-0.104-1.942-0.247-2.907z" />
+                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,8,3.029V10.18C28.06,6.843,23.447,4.843,18.447,4.843C11.045,4.843,4.956,10.119,4.956,17.119C4.956,19.22,5.247,20.083,5.247,20.083H6.306z" />
+                <path fill="#4CAF50" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,8,3.029V10.18c-3.448-3.337-8.06-5.337-13-5.337c-11.045,0-20,8.955-20,20c0,11.045,8.955,20,20,20c11.045,0,19.119-8.174,19.119-19.22c0-1.181-0.104-1.942-0.247-2.907z" />
+                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,8,3.029V10.18c-3.448-3.337-8.06-5.337-13-5.337c-11.045,0-20,8.955-20,20c0,11.045,8.955,20,20,20c11.045,0,19.119-8.174,19.119-19.22c0-1.181-0.104-1.942-0.247-2.907z" />
+              </svg>
               Connect with Google
             </Button>
             <p className="text-xs text-slate-500 mt-2">

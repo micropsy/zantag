@@ -1,5 +1,5 @@
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "@remix-run/cloudflare";
-import { Form, useActionData, useNavigation, Link, useSearchParams } from "@remix-run/react";
+import { Form, useActionData, useNavigation, Link, useSearchParams, useLoaderData } from "@remix-run/react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { getDb } from "~/utils/db.server";
 import { createUserSession, getUserId } from "~/utils/session.server";
@@ -9,11 +9,18 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { getGoogleAuthUrl } from "~/services/google.server";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
   const userId = await getUserId(request, context);
   if (userId) return redirect("/dashboard");
-  return json({});
+
+  const googleAuthUrl = await getGoogleAuthUrl(
+    context.cloudflare.env.GOOGLE_REDIRECT_URI,
+    context.cloudflare.env.GOOGLE_CLIENT_ID
+  );
+
+  return json({ googleAuthUrl });
 };
 
 export const action = async ({ request, context }: ActionFunctionArgs) => {
@@ -21,6 +28,15 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const email = formData.get("email");
     const password = formData.get("password");
+    const intent = formData.get("intent");
+
+    if (intent === "google-oauth") {
+      const googleAuthUrl = await getGoogleAuthUrl(
+        context.cloudflare.env.GOOGLE_REDIRECT_URI,
+        context.cloudflare.env.GOOGLE_CLIENT_ID
+      );
+      return redirect(googleAuthUrl);
+    }
 
     if (typeof email !== "string" || typeof password !== "string") {
       return json({ error: "Invalid form data" }, { status: 400 });
@@ -55,6 +71,7 @@ export default function Login() {
   const isSubmitting = navigation.state === "submitting";
   const [searchParams] = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
+  const { googleAuthUrl } = useLoaderData<typeof loader>();
 
   useEffect(() => {
     if (resetSuccess) {
@@ -145,6 +162,32 @@ export default function Login() {
               ) : (
                 "Sign in"
               )}
+            </Button>
+          </Form>
+
+          <div className="relative mt-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-slate-300" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-slate-500">Or continue with</span>
+            </div>
+          </div>
+
+          <Form action={googleAuthUrl} method="post">
+            <Button
+              type="submit"
+              variant="outline"
+              className="w-full h-11 text-base font-medium flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+            >
+              Sign in with Google
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px" height="20px">
+                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,8,3.029V10.18c-3.448-3.337-8.06-5.337-13-5.337c-11.045,0-20,8.955-20,20c0,11.045,8.955,20,20,20c11.045,0,19.119-8.174,19.119-19.22c0-1.181-0.104-1.942-0.247-2.907z" />
+                <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,8,3.029V10.18C28.06,6.843,23.447,4.843,18.447,4.843C11.045,4.843,4.956,10.119,4.956,17.119C4.956,19.22,5.247,20.083,5.247,20.083H6.306z" />
+                <path fill="#4CAF50" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,8,3.029V10.18c-3.448-3.337-8.06-5.337-13-5.337c-11.045,0-20,8.955-20,20c0,11.045,8.955,20,20,20c11.045,0,19.119-8.174,19.119-19.22c0-1.181-0.104-1.942-0.247-2.907z" />
+                <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,8,3.029V10.18c-3.448-3.337-8.06-5.337-13-5.337c-11.045,0-20,8.955-20,20c0,11.045,8.955,20,20,20c11.045,0,19.119-8.174,19.119-19.22c0-1.181-0.104-1.942-0.247-2.907z" />
+              </svg>
             </Button>
           </Form>
 

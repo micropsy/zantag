@@ -24,6 +24,7 @@ model User {
   profileId         String?     @unique
   isActivated       Boolean     @default(false)
   secretKey         String?
+  googleId          String?     @unique
   status            String      @default("ACTIVE") // ACTIVE, INACTIVE, GRACE_PERIOD
   separatedAt       DateTime?   // Timestamp when staff was removed (start of 30-day grace)
 
