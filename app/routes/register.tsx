@@ -27,6 +27,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const email = formData.get("email");
   const password = formData.get("password");
+  const name = formData.get("name");
   const inviteCode = formData.get("inviteCode");
   const profileIdRaw = formData.get("profileId");
 
@@ -46,6 +47,8 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       { status: 400 }
     );
   }
+
+  const nameValue = typeof name === "string" ? name.trim() : undefined;
 
   if (isInvitationOnly && (!hasProfileId || !hasInviteCode)) {
     return json(
@@ -174,6 +177,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
         data: {
           email,
           password: hashedPassword,
+          name: nameValue,
           role: inviteRole,
           isActivated: true,
           verificationToken,
@@ -183,6 +187,7 @@ export const action = async ({ request, context }: ActionFunctionArgs) => {
       newUser = await createUser(context, {
         email,
         passwordHash: hashedPassword,
+        name: nameValue,
         inviteCode: typeof inviteCode === "string" ? inviteCode : undefined,
         role: inviteRole,
         profileId,
@@ -327,6 +332,17 @@ export default function Register() {
                 />
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                placeholder="John Doe"
+              />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
