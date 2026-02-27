@@ -52,10 +52,10 @@ export async function exchangeGoogleCodeForToken(
     throw new Error("Failed to exchange code for token");
   }
 
-  const data = await response.json();
+  const data: { access_token: string; refresh_token?: string } = await response.json();
   return {
-    accessToken: data.access_token as string,
-    refreshToken: data.refresh_token as string | undefined,
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
   };
 }
 
@@ -115,6 +115,7 @@ export async function findOrCreateUserByGoogle(
       isEmailVerified: googleInfo.verified_email,
       status: "ACTIVE",
       profileId,
+      password: "", // Google users don't have a local password by default
     },
   });
 

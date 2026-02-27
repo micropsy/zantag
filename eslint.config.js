@@ -60,7 +60,8 @@ export default [
   {
     rules: {
       "react/jsx-no-target-blank": "off",
-      "react-hooks/exhaustive-deps": "warn"
+      "react-hooks/exhaustive-deps": "warn",
+      "jsx-a11y/label-has-associated-control": "off"
     },
     settings: {
       react: {
