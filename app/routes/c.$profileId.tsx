@@ -26,11 +26,18 @@ export const loader = async ({ params, context }: LoaderFunctionArgs) => {
   }
 
   if (!user.isActivated) {
+    const newSecretKey = crypto.randomUUID();
+    
+    // Dynamic Key Rotation: Update the user's secretKey in the database immediately
+    await db.user.update({
+      where: { profileId },
+      data: { secretKey: newSecretKey },
+    });
+
     const searchParams = new URLSearchParams();
     searchParams.set("id", profileId);
-    if (user.secretKey) {
-      searchParams.set("inviteCode", user.secretKey);
-    }
+    searchParams.set("inviteCode", newSecretKey);
+    
     return redirect(`/register?${searchParams.toString()}`);
   }
 
