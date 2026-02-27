@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "User" (
+CREATE TABLE IF NOT EXISTS "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "email" TEXT NOT NULL,
     "name" TEXT,
@@ -20,7 +20,7 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
-CREATE TABLE "InviteCode" (
+CREATE TABLE IF NOT EXISTS "InviteCode" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "code" TEXT NOT NULL,
     "isUsed" BOOLEAN NOT NULL DEFAULT false,
@@ -35,7 +35,7 @@ CREATE TABLE "InviteCode" (
 );
 
 -- CreateTable
-CREATE TABLE "Tag" (
+CREATE TABLE IF NOT EXISTS "Tag" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE "Tag" (
 );
 
 -- CreateTable
-CREATE TABLE "Profile" (
+CREATE TABLE IF NOT EXISTS "Profile" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "username" TEXT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE "Profile" (
 );
 
 -- CreateTable
-CREATE TABLE "Link" (
+CREATE TABLE IF NOT EXISTS "Link" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "profileId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE "Link" (
 );
 
 -- CreateTable
-CREATE TABLE "Contact" (
+CREATE TABLE IF NOT EXISTS "Contact" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "profileId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -99,7 +99,7 @@ CREATE TABLE "Contact" (
 );
 
 -- CreateTable
-CREATE TABLE "Document" (
+CREATE TABLE IF NOT EXISTS "Document" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "profileId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -111,7 +111,7 @@ CREATE TABLE "Document" (
 );
 
 -- CreateTable
-CREATE TABLE "Organization" (
+CREATE TABLE IF NOT EXISTS "Organization" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -124,47 +124,46 @@ CREATE TABLE "Organization" (
 );
 
 -- CreateTable
-CREATE TABLE "SystemSetting" (
+CREATE TABLE IF NOT EXISTS "SystemSetting" (
     "key" TEXT NOT NULL PRIMARY KEY,
     "value" TEXT NOT NULL
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_profileId_key" ON "User"("profileId");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_profileId_key" ON "User"("profileId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_googleId_key" ON "User"("googleId");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_googleId_key" ON "User"("googleId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "InviteCode_code_key" ON "InviteCode"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "InviteCode_code_key" ON "InviteCode"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "InviteCode_userId_key" ON "InviteCode"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "InviteCode_userId_key" ON "InviteCode"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Tag_name_key" ON "Tag"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Tag_name_key" ON "Tag"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Tag_slug_key" ON "Tag"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "Tag_slug_key" ON "Tag"("slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Profile_userId_key" ON "Profile"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "Profile_userId_key" ON "Profile"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Profile_username_key" ON "Profile"("username");
+CREATE UNIQUE INDEX IF NOT EXISTS "Profile_username_key" ON "Profile"("username");
 
 -- CreateIndex
-CREATE INDEX "Link_profileId_idx" ON "Link"("profileId");
+CREATE INDEX IF NOT EXISTS "Link_profileId_idx" ON "Link"("profileId");
 
 -- CreateIndex
-CREATE INDEX "Contact_profileId_idx" ON "Contact"("profileId");
+CREATE INDEX IF NOT EXISTS "Contact_profileId_idx" ON "Contact"("profileId");
 
 -- CreateIndex
-CREATE INDEX "Document_profileId_idx" ON "Document"("profileId");
+CREATE INDEX IF NOT EXISTS "Document_profileId_idx" ON "Document"("profileId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Organization_slug_key" ON "Organization"("slug");
-
+CREATE UNIQUE INDEX IF NOT EXISTS "Organization_slug_key" ON "Organization"("slug");
